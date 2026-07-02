@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in the SDK isn't behaving as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+        **Never include API keys or signing secrets in an issue.**
+        Security vulnerabilities should be reported privately — see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: The smallest snippet (or repo link) that reproduces the problem.
+      render: ts
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SDK version
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime & framework
+      placeholder: e.g. Node 22 / Chrome 130 + Vite 6 / Cloudflare Workers
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug output
+      description: If possible, re-run with `debug: true` and paste the `[bugboard]` log lines (keys are auto-redacted, but double-check).
+      render: text

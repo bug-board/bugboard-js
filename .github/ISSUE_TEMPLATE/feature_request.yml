@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an improvement to the SDK.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Note: the wire contract (request format, auth, the 16 reporting methods) is shared by
+        every BugBoard SDK and defined by the API reference — proposals that change it need a
+        spec discussion first, not just an SDK change.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the use case rather than a specific implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like the SDK to support it? Sketch the API if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

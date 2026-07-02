@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/bug-board/bugboard-js/security/advisories/new
+    about: Please report security issues privately, never as a public issue.
+  - name: BugBoard documentation
+    url: https://bugboard.dev/docs
+    about: Product and API documentation, including the SDK guides.
