@@ -1,0 +1,233 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { resolveConfig } from '../src/config';
+import {
+    BugBoardAuthError,
+    BugBoardRateLimitError,
+    BugBoardServerError,
+    BugBoardValidationError,
+} from '../src/errors';
+import { createLogger } from '../src/logger';
+import { createTransport } from '../src/transport';
+import type { ReportPayload } from '../src/types';
+
+const payload: ReportPayload = {
+    severity: 'major',
+    priority: 'medium',
+    title: 'SDK smoke test',
+    tags: [],
+};
+
+const silentLogger = createLogger(false, []);
+
+function transportWith(config: Parameters<typeof resolveConfig>[0] = {}) {
+    const { resolved } = resolveConfig({ apiKey: 'bb_pub_test', ...config });
+    return createTransport(resolved, silentLogger);
+}
+
+function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}) {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json', ...headers },
+    });
+}
+
+beforeEach(() => {
+    vi.useFakeTimers();
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+});
+
+/**
+ * Run a send() to completion while fake timers fast-forward the backoff
+ * sleeps. Handlers are attached immediately so a rejection during the timer
+ * run is never flagged as unhandled.
+ */
+async function settle<T>(promise: Promise<T>): Promise<T> {
+    let outcome: { ok: true; value: T } | { ok: false; error: unknown } | undefined;
+    const tracked = promise.then(
+        (value) => {
+            outcome = { ok: true, value };
+        },
+        (error: unknown) => {
+            outcome = { ok: false, error };
+        },
+    );
+    await vi.runAllTimersAsync();
+    await tracked;
+    if (!outcome) throw new Error('send() did not settle');
+    if (outcome.ok) return outcome.value;
+    throw outcome.error;
+}
+
+describe('transport', () => {
+    it('POSTs JSON with bearer auth and succeeds on 201', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, { data: { id: 1 } }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(transportWith().send(payload));
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(url).toBe('https://bugboard.dev/api/v1/tasks');
+        expect(init.method).toBe('POST');
+        expect(init.body).toBe(JSON.stringify(payload));
+        expect(init.headers).toMatchObject({
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: 'Bearer bb_pub_test',
+        });
+    });
+
+    it('signs with HMAC headers when a secret key is configured', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, {}));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(
+            transportWith({ apiKey: undefined, keyId: 'bbk_x', signingSecret: 'bb_sec_x' }).send(
+                payload,
+            ),
+        );
+
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        const headers = init.headers as Record<string, string>;
+        expect(headers['X-Bb-Key-Id']).toBe('bbk_x');
+        expect(headers['X-Bb-Timestamp']).toMatch(/^\d+$/);
+        expect(headers['X-Bb-Signature']).toMatch(/^[0-9a-f]{64}$/);
+        expect(headers.Authorization).toBeUndefined();
+    });
+
+    it('retries 5xx and eventually succeeds', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(jsonResponse(503, { message: 'down' }))
+            .mockResolvedValueOnce(jsonResponse(502, { message: 'down' }))
+            .mockResolvedValue(jsonResponse(201, {}));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(transportWith().send(payload));
+
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('retries network errors', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockRejectedValueOnce(new TypeError('fetch failed'))
+            .mockResolvedValue(jsonResponse(201, {}));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(transportWith().send(payload));
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('honors Retry-After on 429', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(
+                jsonResponse(429, { message: 'slow down' }, { 'Retry-After': '7' }),
+            )
+            .mockResolvedValue(jsonResponse(201, {}));
+        vi.stubGlobal('fetch', fetchMock);
+        const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+        await settle(transportWith().send(payload));
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        // The retry sleep must use the server's hint (7s), not the default backoff.
+        expect(setTimeoutSpy.mock.calls.some(([, delay]) => delay === 7000)).toBe(true);
+    });
+
+    it('gives up after maxRetries and surfaces a server error', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(500, { message: 'kaput' }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(settle(transportWith({ maxRetries: 2 }).send(payload))).rejects.toBeInstanceOf(
+            BugBoardServerError,
+        );
+        expect(fetchMock).toHaveBeenCalledTimes(3); // initial attempt + 2 retries
+    });
+
+    it.each([
+        [401, BugBoardAuthError],
+        [403, BugBoardAuthError],
+        [422, BugBoardValidationError],
+    ])('never retries a %i', async (status, errorClass) => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(status, { message: 'nope' }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(settle(transportWith().send(payload))).rejects.toBeInstanceOf(errorClass);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('carries the field errors on a 422', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValue(
+                jsonResponse(422, { message: 'invalid', errors: { title: ['Too long.'] } }),
+            );
+        vi.stubGlobal('fetch', fetchMock);
+
+        const error = await settle(transportWith().send(payload)).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(BugBoardValidationError);
+        expect((error as BugBoardValidationError).fieldErrors).toEqual({ title: ['Too long.'] });
+    });
+
+    it('carries retryAfter on a 429 that exhausts retries', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValue(jsonResponse(429, { message: 'limited' }, { 'Retry-After': '3' }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const error = await settle(transportWith({ maxRetries: 0 }).send(payload)).catch(
+            (e: unknown) => e,
+        );
+
+        expect(error).toBeInstanceOf(BugBoardRateLimitError);
+        expect((error as BugBoardRateLimitError).retryAfter).toBe(3);
+    });
+
+    it('treats a quota drop (200 + quota_exceeded) as success and never retries it', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { quota_exceeded: true }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(transportWith().send(payload));
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('aborts a hung request after timeoutMs and retries', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockImplementationOnce(
+                (_url, init: RequestInit) =>
+                    new Promise((_resolve, reject) => {
+                        init.signal?.addEventListener('abort', () =>
+                            reject(new DOMException('aborted', 'AbortError')),
+                        );
+                    }),
+            )
+            .mockResolvedValue(jsonResponse(201, {}));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(transportWith({ timeoutMs: 100 }).send(payload));
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips retries in keepalive (shutdown) mode', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(500, { message: 'kaput' }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(
+            settle(transportWith().send(payload, { keepalive: true })),
+        ).rejects.toBeInstanceOf(BugBoardServerError);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(init.keepalive).toBe(true);
+    });
+});
