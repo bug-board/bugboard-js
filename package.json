@@ -1,0 +1,73 @@
+{
+  "name": "bugboard",
+  "version": "0.1.0",
+  "description": "Official BugBoard SDK for JavaScript and TypeScript — report errors as cards on your project board from Node, the browser, or the edge.",
+  "keywords": [
+    "bugboard",
+    "error-tracking",
+    "error-reporting",
+    "error-monitoring",
+    "bug-tracker",
+    "crash-reporting"
+  ],
+  "homepage": "https://github.com/bug-board/bugboard-js#readme",
+  "bugs": {
+    "url": "https://github.com/bug-board/bugboard-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bug-board/bugboard-js.git"
+  },
+  "license": "MIT",
+  "author": "BugBoard (https://bugboard.dev)",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "peerDependencies": {
+    "tweetnacl-sealedbox-js": "^1.2.0"
+  },
+  "peerDependenciesMeta": {
+    "tweetnacl-sealedbox-js": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.28.0",
+    "@types/node": "^22.15.0",
+    "eslint": "^9.28.0",
+    "eslint-config-prettier": "^10.1.0",
+    "prettier": "^3.5.0",
+    "tsup": "^8.5.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-sealedbox-js": "^1.2.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.33.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
