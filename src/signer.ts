@@ -8,11 +8,26 @@
  *     payload   = timestamp + "." + UPPERCASE(method) + "." + path + "." + sha256_hex(body)
  *     signature = hmac_sha256_hex(key = signingSecret, message = payload)
  *
- * WebCrypto (`globalThis.crypto.subtle`) is used so the same code runs on
- * Node 18+, browsers, and edge runtimes.
+ * WebCrypto (`crypto.subtle`) is used so the same code runs on Node 18+,
+ * browsers, and edge runtimes.
  */
 
 const encoder = new TextEncoder();
+
+let subtlePromise: Promise<SubtleCrypto> | undefined;
+
+/**
+ * Browsers, edge runtimes, and Node 19+ expose WebCrypto as a global; Node 18
+ * only ships it under `node:crypto`, so fall back to a lazy import there.
+ */
+function getSubtle(): Promise<SubtleCrypto> {
+    subtlePromise ??= globalThis.crypto?.subtle
+        ? Promise.resolve(globalThis.crypto.subtle)
+        : import(/* webpackIgnore: true */ /* @vite-ignore */ 'node:crypto').then(
+              (nodeCrypto) => nodeCrypto.webcrypto.subtle as SubtleCrypto,
+          );
+    return subtlePromise;
+}
 
 function toHex(buffer: ArrayBuffer): string {
     return Array.from(new Uint8Array(buffer))
@@ -21,18 +36,20 @@ function toHex(buffer: ArrayBuffer): string {
 }
 
 async function sha256Hex(data: string): Promise<string> {
-    return toHex(await globalThis.crypto.subtle.digest('SHA-256', encoder.encode(data)));
+    const subtle = await getSubtle();
+    return toHex(await subtle.digest('SHA-256', encoder.encode(data)));
 }
 
 async function hmacSha256Hex(secret: string, message: string): Promise<string> {
-    const key = await globalThis.crypto.subtle.importKey(
+    const subtle = await getSubtle();
+    const key = await subtle.importKey(
         'raw',
         encoder.encode(secret),
         { name: 'HMAC', hash: 'SHA-256' },
         false,
         ['sign'],
     );
-    return toHex(await globalThis.crypto.subtle.sign('HMAC', key, encoder.encode(message)));
+    return toHex(await subtle.sign('HMAC', key, encoder.encode(message)));
 }
 
 /** Bearer header for publishable keys. */

@@ -41,5 +41,5 @@ body:
     id: logs
     attributes:
       label: Debug output
-      description: If possible, re-run with `debug: true` and paste the `[bugboard]` log lines (keys are auto-redacted, but double-check).
+      description: 'If possible, re-run with `debug: true` and paste the `[bugboard]` log lines (keys are auto-redacted, but double-check).'
       render: text
