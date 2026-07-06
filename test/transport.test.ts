@@ -81,6 +81,25 @@ describe('transport', () => {
         });
     });
 
+    it('logs locally and never sends when logLocally is set (even with debug off)', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, {}));
+        vi.stubGlobal('fetch', fetchMock);
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+        const { resolved } = resolveConfig({ apiKey: 'bb_pub_test', logLocally: true });
+        // debug is false, so the logLocally channel must still emit.
+        await settle(createTransport(resolved, createLogger(false, [])).send(payload));
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(logSpy).toHaveBeenCalledTimes(1);
+        const logged = (logSpy.mock.calls[0] as unknown[]).join(' ');
+        expect(logged).toContain('[bugboard]');
+        expect(logged).toContain('Report (log-only, not sent):');
+        expect(logged).toContain('SDK smoke test');
+
+        logSpy.mockRestore();
+    });
+
     it('signs with HMAC headers when a secret key is configured', async () => {
         const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, {}));
         vi.stubGlobal('fetch', fetchMock);

@@ -7,6 +7,8 @@
  */
 
 export interface Logger {
+    /** Always emitted (independent of `debug`). Used by the `logLocally` dry-run mode. */
+    log(...args: unknown[]): void;
     debug(...args: unknown[]): void;
     warn(...args: unknown[]): void;
     error(...args: unknown[]): void;
@@ -28,12 +30,16 @@ export function createLogger(debug: boolean, secrets: readonly (string | undefin
         return text;
     };
 
+    // Always emitted, regardless of `debug` — this is the `logLocally` channel.
+    const log = (...args: unknown[]) => console.log(PREFIX, ...args.map(redact));
+
     if (!debug) {
         const noop = () => undefined;
-        return { debug: noop, warn: noop, error: noop };
+        return { log, debug: noop, warn: noop, error: noop };
     }
 
     return {
+        log,
         debug: (...args) => console.debug(PREFIX, ...args.map(redact)),
         warn: (...args) => console.warn(PREFIX, ...args.map(redact)),
         error: (...args) => console.error(PREFIX, ...args.map(redact)),

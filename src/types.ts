@@ -88,6 +88,8 @@ export interface BugBoardConfig {
     beforeSend?: (payload: ReportPayload) => ReportPayload | null;
     /** Verbose internal logging. Keys are always redacted. */
     debug?: boolean;
+    /** When true, reports are logged locally instead of being sent. Useful for local debugging. */
+    logLocally?: boolean;
     /**
      * Override the ingestion endpoint.
      *

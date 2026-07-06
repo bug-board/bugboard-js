@@ -149,6 +149,12 @@ export function createTransport(config: ResolvedConfig, logger: Logger): Transpo
 
     return {
         async send(payload, options = {}) {
+            // Dry-run mode: log the readable payload locally instead of sending it.
+            if (config.logLocally) {
+                logger.log('Report (log-only, not sent):', JSON.stringify(payload, null, 2));
+                return;
+            }
+
             const body = await prepareBody(payload);
             const maxRetries = options.keepalive ? 0 : config.maxRetries;
 

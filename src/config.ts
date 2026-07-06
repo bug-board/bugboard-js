@@ -26,6 +26,7 @@ export interface ResolvedConfig {
     maxRetries: number;
     beforeSend?: (payload: ReportPayload) => ReportPayload | null;
     debug: boolean;
+    logLocally: boolean;
     endpoint: string;
 }
 
@@ -102,6 +103,7 @@ export function resolveConfig(config: BugBoardConfig): {
             maxRetries: nonNegativeInt(config.maxRetries, 3),
             beforeSend: config.beforeSend,
             debug: config.debug ?? false,
+            logLocally: config.logLocally ?? false,
             endpoint: config.endpoint || DEFAULT_ENDPOINT,
         },
         warnings,

@@ -156,6 +156,7 @@ const bugboard = createClient({
 | `maxRetries`          | `number`   | `3`     | Retries for 429/5xx/network errors (with backoff + jitter, honors `Retry-After`). |
 | `beforeSend`          | `function` | —       | Scrub PII or veto a report — return the payload, or `null` to drop it.            |
 | `debug`               | `boolean`  | `false` | Verbose internal logging (keys always redacted).                                  |
+| `logLocally`          | `boolean`  | `false` | Log each report locally instead of sending it (dry run).                          |
 
 Provide **either** `apiKey` **or** `keyId` + `signingSecret` — the SDK picks bearer or HMAC auth
 from which is set. With no credentials the client disables itself with a warning instead of
