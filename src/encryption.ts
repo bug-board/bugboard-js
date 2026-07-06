@@ -6,8 +6,9 @@
  * leaves the client, so it is opaque in the browser network tab, at proxies,
  * and in access logs. BugBoard decrypts on receipt.
  *
- * The binding (`tweetnacl-sealedbox-js`, an optional peer dependency) is
- * lazy-loaded on first use — apps that never enable encryption load nothing.
+ * The binding (`tweetnacl-sealedbox-js`) ships with the SDK as a regular
+ * dependency, but it is lazy-loaded via a dynamic import on first use — apps
+ * that never enable encryption load nothing.
  */
 
 type Seal = (message: Uint8Array, publicKey: Uint8Array) => Uint8Array;
@@ -24,11 +25,12 @@ async function loadSeal(): Promise<Seal> {
             return seal;
         },
         (cause: unknown) => {
-            sealPromise = undefined; // allow a later attempt if the app installs it
+            sealPromise = undefined; // allow a later retry
             throw new Error(
-                'encryptionPublicKey is set but the optional peer dependency ' +
-                    '"tweetnacl-sealedbox-js" could not be loaded. ' +
-                    'Install it with: npm i tweetnacl-sealedbox-js',
+                'encryptionPublicKey is set but the bundled sealed-box binding ' +
+                    '"tweetnacl-sealedbox-js" failed to load. It ships with the SDK, ' +
+                    'so this usually means a broken or partial install — try ' +
+                    'reinstalling dependencies.',
                 { cause },
             );
         },

@@ -5,8 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 The official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report errors
-as **cards** on your project board — from Node 18+, every browser framework, and edge runtimes —
-with **zero dependencies**, built on the platform `fetch`.
+as **cards** on your project board — from Node 18+, every browser framework, and edge runtimes — built on the platform `fetch`. The default path loads **no dependencies**; opt-in payload encryption lazy-loads a tiny bundled sealed-box binding only when you set an encryption key.
 
 ```ts
 import { createClient } from 'bugboard';
@@ -166,11 +165,10 @@ throwing.
 
 Request bodies are readable in the browser network tab and at TLS-terminating proxies. Set an
 encryption key and every payload is sealed (libsodium sealed box, X25519) before it leaves the
-client — opaque everywhere on the wire; BugBoard decrypts on receipt:
+client — opaque everywhere on the wire; BugBoard decrypts on receipt.
 
-```bash
-npm install tweetnacl-sealedbox-js # optional peer dependency, lazy-loaded
-```
+The sealed-box binding (`tweetnacl-sealedbox-js`) ships with `bugboard` and is lazy-loaded
+automatically the first time an encryption key is used — nothing extra to install:
 
 ```ts
 export default createClient({
