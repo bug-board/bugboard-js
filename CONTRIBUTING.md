@@ -46,8 +46,9 @@ Keep these invariants in mind; they are what make the SDK safe to embed in other
 
 1. **Never throw into the host app.** Every public method is fire-and-forget; failures go to
    the debug logger.
-2. **Zero runtime dependencies.** Only platform APIs (`fetch`, WebCrypto). The sealed-box
-   binding stays an optional, lazy-loaded peer dependency.
+2. **No dependencies on the default path.** Only platform APIs (`fetch`, WebCrypto). The
+   sealed-box binding (`tweetnacl-sealedbox-js`) is a bundled dependency, lazy-loaded only when
+   payload encryption is enabled — apps that never encrypt load nothing extra.
 3. **Never log key material.** The logger redacts secrets; keep it that way.
 4. **The 16 reporting methods are generated**, not hand-written — extend the severity/priority
    tables in `src/types.ts` rather than adding one-off methods.

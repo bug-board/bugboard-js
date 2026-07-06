@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   limits, secret-redacting debug logger, and graceful-shutdown flushing (Node `beforeExit`,
   browser `pagehide` with `keepalive`).
 - Optional payload encryption via libsodium-compatible sealed boxes
-  (`tweetnacl-sealedbox-js`, lazy-loaded optional peer dependency).
+  (`tweetnacl-sealedbox-js`, a bundled dependency that is lazy-loaded only when encryption is
+  enabled).
 
 [unreleased]: https://github.com/bug-board/bugboard-js/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/bug-board/bugboard-js/releases/tag/v0.1.0
