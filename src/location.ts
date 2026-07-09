@@ -30,6 +30,32 @@ interface StackFrame {
 }
 
 /**
+ * Reduce a stack file to the path a developer would recognise.
+ *
+ * In a browser the stack names a module by its full URL, and dev servers
+ * cache-bust it with a query string, so a Vite app reports
+ * `http://localhost:5174/src/App.tsx?t=1783593985084` for what the developer
+ * calls `/src/App.tsx`. Neither the origin (already implied by the report) nor
+ * the query (different on every reload, which would split one file across many
+ * identities server-side) carries information, so we drop both.
+ *
+ * Plain filesystem paths — Node's `/app/src/index.js`, Windows' `C:\app\x.js` —
+ * have no `scheme://` and pass through untouched. `file:///a/b.js` loses only
+ * its scheme and empty host, leaving `/a/b.js`.
+ */
+function normalizeFile(file: string): string {
+    let normalized = file;
+
+    const queryOrHash = normalized.search(/[?#]/);
+    if (queryOrHash !== -1) normalized = normalized.slice(0, queryOrHash);
+
+    const withoutOrigin = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\/[^/]*(\/.*)$/.exec(normalized);
+    if (withoutOrigin?.[1] !== undefined) normalized = withoutOrigin[1];
+
+    return normalized;
+}
+
+/**
  * Parse one stack line into a frame, or `undefined` if it isn't a frame.
  *
  * Two dialects cover every runtime we target:
@@ -102,6 +128,8 @@ export function captureLocation(): SourceLocation | undefined {
         }
 
         // Frame 0 is captureLocation itself → its directory identifies SDK frames.
+        // Compare raw files: two origins can share a directory path, and only the
+        // raw form tells them apart.
         const self = frames[0];
         if (self === undefined) return undefined;
         const selfDir = dirOf(self.file);
@@ -109,7 +137,7 @@ export function captureLocation(): SourceLocation | undefined {
         for (let i = 1; i < frames.length; i++) {
             const frame = frames[i]!;
             if (dirOf(frame.file) !== selfDir) {
-                return { file: frame.file, line: frame.line };
+                return { file: normalizeFile(frame.file), line: frame.line };
             }
         }
 
