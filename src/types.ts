@@ -101,11 +101,12 @@ export interface BugBoardConfig {
     /** When true, reports are logged locally instead of being sent. Useful for local debugging. */
     logLocally?: boolean;
     /**
-     * Override the ingestion endpoint.
+     * Override the ingestion origin, e.g. `http://localhost:8000`. Only the
+     * origin is used — the SDK appends `/api/v1/tasks` itself.
      *
      * @internal For SDK tests only — production clients always target BugBoard.
      */
-    endpoint?: string;
+    baseUrl?: string;
 }
 
 /**

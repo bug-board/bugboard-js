@@ -8,6 +8,7 @@ import {
     BugBoardValidationError,
 } from '../src/errors';
 import { createLogger } from '../src/logger';
+import { signedHeaders } from '../src/signer';
 import { createTransport } from '../src/transport';
 import type { ReportPayload } from '../src/types';
 
@@ -79,6 +80,35 @@ describe('transport', () => {
             Accept: 'application/json',
             Authorization: 'Bearer bb_pub_test',
         });
+    });
+
+    it('POSTs to the api route under a custom base url, still signing /api/v1/tasks', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, { data: { id: 1 } }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(
+            transportWith({
+                apiKey: undefined,
+                keyId: 'bbk_test',
+                signingSecret: 'bb_sec_test',
+                baseUrl: 'http://localhost:8000/',
+            }).send(payload),
+        );
+
+        const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(url).toBe('http://localhost:8000/api/v1/tasks');
+
+        // The base url must not leak into the signed path.
+        const headers = init.headers as Record<string, string>;
+        const expected = await signedHeaders(
+            'bbk_test',
+            'bb_sec_test',
+            'POST',
+            '/api/v1/tasks',
+            JSON.stringify(payload),
+            Number(headers['X-Bb-Timestamp']),
+        );
+        expect(headers['X-Bb-Signature']).toBe(expected['X-Bb-Signature']);
     });
 
     it('logs locally and never sends when logLocally is set (even with debug off)', async () => {

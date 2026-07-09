@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The internal `endpoint` option is now `baseUrl` and takes an origin (`http://localhost:8000`,
+  trailing slash optional) instead of the full ingestion URL — the SDK appends `/api/v1/tasks`
+  itself. Only the origin is honored; a base URL that isn't absolute warns and falls back to
+  `https://bugboard.dev`.
+
 ## [0.1.0] - 2026-07-02
 
 ### Added
