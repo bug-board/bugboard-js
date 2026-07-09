@@ -98,4 +98,21 @@ describe('buildPayload', () => {
 
         expect(payload.tags).toEqual(['web', 'ui']);
     });
+
+    it('attaches file_name and line_number when a location is given', () => {
+        const payload = buildPayload('minor', 'low', 'Title', undefined, undefined, noContext, {
+            file: 'src/pages/Checkout.tsx',
+            line: 42,
+        });
+
+        expect(payload.file_name).toBe('src/pages/Checkout.tsx');
+        expect(payload.line_number).toBe(42);
+    });
+
+    it('omits file_name and line_number when no location is given', () => {
+        const payload = buildPayload('minor', 'low', 'Title', undefined, undefined, noContext);
+
+        expect(payload.file_name).toBeUndefined();
+        expect(payload.line_number).toBeUndefined();
+    });
 });

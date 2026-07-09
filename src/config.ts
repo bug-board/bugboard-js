@@ -15,6 +15,7 @@ export interface ResolvedConfig {
     encryptionPublicKey?: string;
     encryptionKeyId?: string;
     enabled: boolean;
+    captureLocation: boolean;
     environment?: string;
     release?: string;
     defaultTags: readonly string[];
@@ -92,6 +93,7 @@ export function resolveConfig(config: BugBoardConfig): {
             encryptionPublicKey: config.encryptionPublicKey || undefined,
             encryptionKeyId: config.encryptionKeyId || undefined,
             enabled,
+            captureLocation: config.captureLocation ?? true,
             environment: config.environment || undefined,
             release: config.release || undefined,
             defaultTags: config.defaultTags ?? [],

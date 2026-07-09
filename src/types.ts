@@ -46,6 +46,10 @@ export interface ReportPayload {
     title: string;
     description?: string;
     tags: string[];
+    /** File of the code that made the reporting call (auto-captured). */
+    file_name?: string;
+    /** Line of the code that made the reporting call (auto-captured). */
+    line_number?: number;
 }
 
 /**
@@ -72,6 +76,12 @@ export interface BugBoardConfig {
     release?: string;
     /** Tags merged into every card. */
     defaultTags?: readonly string[];
+    /**
+     * Auto-capture the file and line of each reporting call (sent as
+     * `file_name`/`line_number`). Defaults to `true`; set `false` to skip
+     * reading the call stack.
+     */
+    captureLocation?: boolean;
     /** Probability (0–1) that a report is sent. Sample under load to stay within limits. */
     sampleRate?: number;
     /** Queue cap. Overflow drops the newest report (counted in debug output). */

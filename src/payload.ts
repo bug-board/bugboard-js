@@ -1,4 +1,5 @@
 import type { ResolvedConfig } from './config';
+import type { SourceLocation } from './location';
 import type { Priority, ReportPayload, Severity, TagsInput } from './types';
 
 /** Server caps (API reference §4). Clamped client-side so a report never 422s on size. */
@@ -57,8 +58,9 @@ export function normalizeTags(tags: TagsInput | undefined): string[] {
 
 /**
  * Build the request body for one report. The severity/priority come from the
- * method name (never from user input), and `environment`/`release`/`defaultTags`
- * are folded into the tags.
+ * method name (never from user input), `environment`/`release`/`defaultTags`
+ * are folded into the tags, and the auto-captured call site (when available)
+ * is attached as `file_name`/`line_number`.
  */
 export function buildPayload(
     severity: Severity,
@@ -67,6 +69,7 @@ export function buildPayload(
     description: unknown,
     tags: TagsInput | undefined,
     config: Pick<ResolvedConfig, 'environment' | 'release' | 'defaultTags'>,
+    location?: SourceLocation,
 ): ReportPayload {
     const baseTags: string[] = [...config.defaultTags];
     if (config.environment) baseTags.push(`env:${config.environment}`);
@@ -81,6 +84,11 @@ export function buildPayload(
 
     const text = describe(description);
     if (text !== undefined) payload.description = text;
+
+    if (location) {
+        payload.file_name = location.file;
+        payload.line_number = location.line;
+    }
 
     return payload;
 }
