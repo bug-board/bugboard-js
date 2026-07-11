@@ -4,9 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { bearerHeaders, signedHeaders } from '../src/signer';
 
 /**
- * Reference vector shared with the PHP SDK's SignerTest, generated with the
- * openssl recipe from the API reference §10 — all SDKs must produce these
- * exact bytes for the same inputs.
+ * Reference vector generated with the openssl recipe from the API reference
+ * §10 — the signer must produce these exact bytes for the same inputs.
  */
 const VECTOR = {
     keyId: 'bbk_test123',

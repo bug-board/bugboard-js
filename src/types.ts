@@ -25,7 +25,7 @@ export type PrioritySuffix = keyof typeof PRIORITY_SUFFIXES;
 /** The 16 reporting method names: `critical`, `criticalLow`, … `minorHigh`. */
 export type ReportMethodName = `${Severity}${PrioritySuffix}`;
 
-/** Tags accept an array (`['ui', 'android']`) or a CSV string (`'ui,android'`). */
+/** Tags accept an array (`['ui', 'checkout']`) or a CSV string (`'ui,checkout'`). */
 export type TagsInput = readonly string[] | string;
 
 /**
@@ -54,11 +54,11 @@ export interface ReportPayload {
 
 /**
  * Client configuration. Provide **either** `apiKey` (publishable key, bearer
- * auth — browsers/mobile) **or** `keyId` + `signingSecret` (secret key, HMAC
+ * auth — client-side code) **or** `keyId` + `signingSecret` (secret key, HMAC
  * auth — servers). The SDK picks the auth scheme from which is set.
  */
 export interface BugBoardConfig {
-    /** Publishable key (`bb_pub_…`) sent as a bearer token. Browser/mobile only. */
+    /** Publishable key (`bb_pub_…`) sent as a bearer token. Client-side only. */
     apiKey?: string;
     /** Public key id (`bbk_…`) identifying which secret key signed the request. */
     keyId?: string;
