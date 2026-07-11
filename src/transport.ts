@@ -118,6 +118,10 @@ export function createTransport(config: ResolvedConfig, logger: Logger): Transpo
                 headers: {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
+                    // A header, not a body field: it stays readable when the body is
+                    // encrypted, and out of reach of `beforeSend` (§5). It is not
+                    // covered by the HMAC signature, which spans the body only.
+                    ...(config.hideApiResponse ? { 'X-Bb-Hide-Response': 'true' } : {}),
                     ...(await authHeaders(body)),
                 },
                 body,

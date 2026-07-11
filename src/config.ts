@@ -28,6 +28,7 @@ export interface ResolvedConfig {
     beforeSend?: (payload: ReportPayload) => ReportPayload | null;
     debug: boolean;
     logLocally: boolean;
+    hideApiResponse: boolean;
     endpoint: string;
 }
 
@@ -135,6 +136,7 @@ export function resolveConfig(config: BugBoardConfig): {
             beforeSend: config.beforeSend,
             debug: config.debug ?? false,
             logLocally: config.logLocally ?? false,
+            hideApiResponse: config.hideApiResponse ?? true,
             endpoint: resolveEndpoint(config.baseUrl, warnings),
         },
         warnings,

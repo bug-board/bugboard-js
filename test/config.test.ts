@@ -15,8 +15,16 @@ describe('resolveConfig', () => {
             timeoutMs: 5000,
             maxRetries: 3,
             debug: false,
+            logLocally: false,
+            hideApiResponse: true,
             endpoint: 'https://bugboard.dev/api/v1/tasks',
         });
+    });
+
+    it('honors hideApiResponse: false', () => {
+        const { resolved } = resolveConfig({ apiKey: 'bb_pub_x', hideApiResponse: false });
+
+        expect(resolved.hideApiResponse).toBe(false);
     });
 
     it('appends the api route to the base url, with or without a trailing slash', () => {

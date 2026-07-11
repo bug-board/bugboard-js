@@ -101,6 +101,12 @@ export interface BugBoardConfig {
     /** When true, reports are logged locally instead of being sent. Useful for local debugging. */
     logLocally?: boolean;
     /**
+     * Ask the server to leave the created card out of its response, so a report
+     * isn't echoed back in plaintext where the network tab can read it. Defaults
+     * to `true`; set `false` to receive the full response body.
+     */
+    hideApiResponse?: boolean;
+    /**
      * Override the ingestion origin, e.g. `http://localhost:8000`. Only the
      * origin is used — the SDK appends `/api/v1/tasks` itself.
      *

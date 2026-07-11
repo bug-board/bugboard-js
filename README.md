@@ -157,6 +157,8 @@ const bugboard = createClient({
 | `beforeSend`          | `function` | —       | Scrub PII or veto a report — return the payload, or `null` to drop it.            |
 | `debug`               | `boolean`  | `false` | Verbose internal logging (keys always redacted).                                  |
 | `logLocally`          | `boolean`  | `false` | Log each report locally instead of sending it (dry run).                          |
+| `captureLocation`     | `boolean`  | `true`  | Auto-capture the caller's file/line as `file_name`/`line_number`.                 |
+| `hideApiResponse`     | `boolean`  | `true`  | Ask the server to omit the card from its response (not echoed back).              |
 
 Provide **either** `apiKey` **or** `keyId` + `signingSecret` — the SDK picks bearer or HMAC auth
 from which is set. With no credentials the client disables itself with a warning instead of
