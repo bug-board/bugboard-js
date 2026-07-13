@@ -4,8 +4,10 @@
 [![npm version](https://img.shields.io/npm/v/bugboard.svg)](https://www.npmjs.com/package/bugboard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report errors
-as **cards** on your project board — from Node 18+, every browser framework, and edge runtimes — built on the platform `fetch`. The default path loads **no dependencies**; opt-in payload encryption lazy-loads a tiny bundled sealed-box binding only when you set an encryption key.
+The official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report errors as
+**cards** on your project board — from Node 18+, browsers, and edge runtimes — built on the platform
+`fetch`. Importing the SDK pulls in **nothing else**: the one bundled dependency is a sealed-box
+binding that is lazy-loaded only if you turn on payload encryption.
 
 ```ts
 import { createClient } from 'bugboard';
@@ -28,9 +30,10 @@ queue with retries and backoff, and the SDK **never throws into your app**.
 npm install bugboard
 ```
 
-Works out of the box with React, Vue, Svelte, Next.js, Nuxt, Vite, Express, Fastify, and edge
-runtimes (Cloudflare Workers, Vercel Edge, Deno) — the package ships ESM + CJS builds with full
-TypeScript types and uses only platform APIs (`fetch`, WebCrypto).
+There is nothing framework-specific to install. The SDK is a single framework-agnostic client that
+uses only platform APIs (`fetch`, WebCrypto), so the same package runs unchanged on Node 18+, in any
+browser or bundler (Vite, webpack, Next.js, Nuxt…), and on edge runtimes (Cloudflare Workers, Vercel
+Edge, Deno). It ships ESM + CJS builds with full TypeScript types.
 
 ## Setup
 
@@ -139,7 +142,7 @@ const bugboard = createClient({
 
 | Option                | Type       | Default | Purpose                                                                           |
 | --------------------- | ---------- | ------- | --------------------------------------------------------------------------------- |
-| `apiKey`              | `string`   | —       | Publishable key (`bb_pub_…`), sent as a bearer token. Browser/mobile.             |
+| `apiKey`              | `string`   | —       | Publishable key (`bb_pub_…`), sent as a bearer token. Browser / client-side.      |
 | `keyId`               | `string`   | —       | Public key id (`bbk_…`) for HMAC auth. Servers.                                   |
 | `signingSecret`       | `string`   | —       | Signing secret (`bb_sec_…`). Never transmitted.                                   |
 | `encryptionPublicKey` | `string`   | —       | Base64 X25519 public key. When set, every payload is encrypted in transit.        |
@@ -157,6 +160,8 @@ const bugboard = createClient({
 | `beforeSend`          | `function` | —       | Scrub PII or veto a report — return the payload, or `null` to drop it.            |
 | `debug`               | `boolean`  | `false` | Verbose internal logging (keys always redacted).                                  |
 | `logLocally`          | `boolean`  | `false` | Log each report locally instead of sending it (dry run).                          |
+| `captureLocation`     | `boolean`  | `true`  | Auto-capture the caller's file/line as `file_name`/`line_number`.                 |
+| `hideApiResponse`     | `boolean`  | `true`  | Ask the server to omit the card from its response (not echoed back).              |
 
 Provide **either** `apiKey` **or** `keyId` + `signingSecret` — the SDK picks bearer or HMAC auth
 from which is set. With no credentials the client disables itself with a warning instead of
@@ -199,8 +204,30 @@ to embed in client code; the private key never leaves BugBoard.
 Everything is fully typed, including all 16 method names:
 
 ```ts
-import type { BugBoardClient, BugBoardConfig, ReportPayload } from 'bugboard';
+import type {
+  BugBoardClient, // the client: 16 report methods + flush()
+  BugBoardConfig, // every option in the table above
+  ReportPayload, // what beforeSend receives and returns
+  ReportFn, // (title, description?, tags?) => void
+  ReportMethodName, // 'critical' | 'criticalLow' | … the 16 names
+  Severity, // 'critical' | 'major' | 'moderate' | 'minor'
+  Priority, // 'low' | 'medium' | 'high'
+  TagsInput, // readonly string[] | string
+} from 'bugboard';
 ```
+
+## Error types
+
+The SDK **never throws into your app** — these are exported so you can recognize failures on the
+debug channel and in your own logging, not because you have to catch them:
+
+| Class                     | Raised on                      | Extra                                   |
+| ------------------------- | ------------------------------ | --------------------------------------- |
+| `BugBoardError`           | base class for the four below  | —                                       |
+| `BugBoardAuthError`       | 401 / 403 — bad or revoked key | —                                       |
+| `BugBoardValidationError` | 422 — the payload was rejected | `fieldErrors: Record<string, string[]>` |
+| `BugBoardRateLimitError`  | 429 — too many reports         | `retryAfter?: number` (seconds)         |
+| `BugBoardServerError`     | 5xx, network failure, timeout  | —                                       |
 
 ## Contributing
 

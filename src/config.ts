@@ -1,9 +1,9 @@
 import type { BugBoardConfig, ReportPayload } from './types';
 
-/** BugBoard's single ingestion endpoint — the SDK never takes a base URL. */
-export const DEFAULT_ENDPOINT = 'https://bugboard.dev/api/v1/tasks';
+/** BugBoard's ingestion origin. */
+export const DEFAULT_BASE_URL = 'https://bugboard.dev';
 
-/** The signed request path (leading slash, no query string). */
+/** The ingestion route, appended to the base URL. Also the signed request path. */
 export const API_PATH = '/api/v1/tasks';
 
 /** Resolved configuration with every default applied. */
@@ -15,6 +15,7 @@ export interface ResolvedConfig {
     encryptionPublicKey?: string;
     encryptionKeyId?: string;
     enabled: boolean;
+    captureLocation: boolean;
     environment?: string;
     release?: string;
     defaultTags: readonly string[];
@@ -27,6 +28,7 @@ export interface ResolvedConfig {
     beforeSend?: (payload: ReportPayload) => ReportPayload | null;
     debug: boolean;
     logLocally: boolean;
+    hideApiResponse: boolean;
     endpoint: string;
 }
 
@@ -42,6 +44,35 @@ const nonNegativeInt = (value: number | undefined, fallback: number): number =>
     typeof value === 'number' && Number.isFinite(value) && value >= 0
         ? Math.floor(value)
         : fallback;
+
+/**
+ * Build the full ingestion URL from a base URL, keeping only its origin so a
+ * trailing slash or a stray path prefix can't change the route we sign.
+ *
+ * An unparseable base URL falls back to BugBoard rather than throwing — a bad
+ * option must never take down the app the SDK is monitoring.
+ */
+function resolveEndpoint(baseUrl: string | undefined, warnings: string[]): string {
+    if (!baseUrl?.trim()) return DEFAULT_BASE_URL + API_PATH;
+
+    let origin: string | undefined;
+    try {
+        origin = new URL(baseUrl).origin;
+    } catch {
+        origin = undefined;
+    }
+
+    // Non-special schemes (e.g. `localhost:8000`, parsed as scheme `localhost:`)
+    // have no origin and serialize to the string 'null'.
+    if (!origin || origin === 'null') {
+        warnings.push(
+            `baseUrl ${JSON.stringify(baseUrl)} is not an absolute URL — falling back to ${DEFAULT_BASE_URL}.`,
+        );
+        return DEFAULT_BASE_URL + API_PATH;
+    }
+
+    return origin + API_PATH;
+}
 
 /**
  * Apply defaults and pick the auth scheme from which credentials are set.
@@ -92,6 +123,7 @@ export function resolveConfig(config: BugBoardConfig): {
             encryptionPublicKey: config.encryptionPublicKey || undefined,
             encryptionKeyId: config.encryptionKeyId || undefined,
             enabled,
+            captureLocation: config.captureLocation ?? true,
             environment: config.environment || undefined,
             release: config.release || undefined,
             defaultTags: config.defaultTags ?? [],
@@ -104,7 +136,8 @@ export function resolveConfig(config: BugBoardConfig): {
             beforeSend: config.beforeSend,
             debug: config.debug ?? false,
             logLocally: config.logLocally ?? false,
-            endpoint: config.endpoint || DEFAULT_ENDPOINT,
+            hideApiResponse: config.hideApiResponse ?? true,
+            endpoint: resolveEndpoint(config.baseUrl, warnings),
         },
         warnings,
     };

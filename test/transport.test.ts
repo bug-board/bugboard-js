@@ -8,6 +8,7 @@ import {
     BugBoardValidationError,
 } from '../src/errors';
 import { createLogger } from '../src/logger';
+import { signedHeaders } from '../src/signer';
 import { createTransport } from '../src/transport';
 import type { ReportPayload } from '../src/types';
 
@@ -81,6 +82,35 @@ describe('transport', () => {
         });
     });
 
+    it('POSTs to the api route under a custom base url, still signing /api/v1/tasks', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, { data: { id: 1 } }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(
+            transportWith({
+                apiKey: undefined,
+                keyId: 'bbk_test',
+                signingSecret: 'bb_sec_test',
+                baseUrl: 'http://localhost:8000/',
+            }).send(payload),
+        );
+
+        const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(url).toBe('http://localhost:8000/api/v1/tasks');
+
+        // The base url must not leak into the signed path.
+        const headers = init.headers as Record<string, string>;
+        const expected = await signedHeaders(
+            'bbk_test',
+            'bb_sec_test',
+            'POST',
+            '/api/v1/tasks',
+            JSON.stringify(payload),
+            Number(headers['X-Bb-Timestamp']),
+        );
+        expect(headers['X-Bb-Signature']).toBe(expected['X-Bb-Signature']);
+    });
+
     it('logs locally and never sends when logLocally is set (even with debug off)', async () => {
         const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, {}));
         vi.stubGlobal('fetch', fetchMock);
@@ -116,6 +146,69 @@ describe('transport', () => {
         expect(headers['X-Bb-Timestamp']).toMatch(/^\d+$/);
         expect(headers['X-Bb-Signature']).toMatch(/^[0-9a-f]{64}$/);
         expect(headers.Authorization).toBeUndefined();
+    });
+
+    it('asks the server to hide the response by default, and omits the header when opted out', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, { deduplicated: false }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(transportWith().send(payload));
+        await settle(transportWith({ hideApiResponse: false }).send(payload));
+
+        const headersOf = (call: number) =>
+            (fetchMock.mock.calls[call] as [string, RequestInit])[1].headers as Record<
+                string,
+                string
+            >;
+        expect(headersOf(0)['X-Bb-Hide-Response']).toBe('true');
+        expect(headersOf(1)['X-Bb-Hide-Response']).toBeUndefined();
+
+        // The preference is a header, never a body field — it must not reach the payload.
+        for (const [, init] of fetchMock.mock.calls as [string, RequestInit][]) {
+            expect(init.body).toBe(JSON.stringify(payload));
+        }
+    });
+
+    it('keeps the hide-response header outside the HMAC signature', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, {}));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await settle(
+            transportWith({ apiKey: undefined, keyId: 'bbk_x', signingSecret: 'bb_sec_x' }).send(
+                payload,
+            ),
+        );
+
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        const headers = init.headers as Record<string, string>;
+        expect(headers['X-Bb-Hide-Response']).toBe('true');
+
+        // The signature spans method + path + body only, so it is the same as it
+        // would be with no hide-response header on the request at all.
+        const expected = await signedHeaders(
+            'bbk_x',
+            'bb_sec_x',
+            'POST',
+            '/api/v1/tasks',
+            JSON.stringify(payload),
+            Number(headers['X-Bb-Timestamp']),
+        );
+        expect(headers['X-Bb-Signature']).toBe(expected['X-Bb-Signature']);
+    });
+
+    it('still reads the outcome flags when the server hides the card', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { quota_exceeded: true }));
+        vi.stubGlobal('fetch', fetchMock);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+        const { resolved } = resolveConfig({ apiKey: 'bb_pub_test' });
+        await settle(createTransport(resolved, createLogger(true, [])).send(payload));
+
+        // A hidden response carries no `data`, but the control flags survive (§5).
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect((warnSpy.mock.calls[0] as unknown[]).join(' ')).toContain('quota is exhausted');
+
+        warnSpy.mockRestore();
     });
 
     it('retries 5xx and eventually succeeds', async () => {

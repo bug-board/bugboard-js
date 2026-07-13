@@ -2,8 +2,9 @@
  * BugBoard SDK for JavaScript and TypeScript.
  *
  * Report errors as cards on your BugBoard project board from Node 18+,
- * browsers, and edge runtimes — zero dependencies, built on the platform
- * `fetch`.
+ * browsers, and edge runtimes. Built on the platform `fetch`; the sole bundled
+ * dependency is a sealed-box binding, lazy-loaded only when payload encryption
+ * is enabled, so importing this module pulls in nothing.
  *
  * @packageDocumentation
  */

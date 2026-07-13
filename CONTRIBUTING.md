@@ -7,11 +7,10 @@ idea to merged pull request.
 
 - **Bugs & features** — open an [issue](https://github.com/bug-board/bugboard-js/issues) first
   so we can discuss the approach before you invest time in code.
-- **Wire-contract changes** — the request format, auth schemes, retry policy, and the
-  16-method reporting surface are defined by the BugBoard SDK specification (the
-  [API reference](https://bugboard.dev/docs/api-reference)) and implemented identically by every
-  official SDK. Changes to that contract must be discussed in an issue first; SDK repos don't
-  diverge from the spec on their own.
+- **Wire-contract changes** — the request format, auth schemes, retry policy, and the 16-method
+  reporting surface are defined by the [API reference](https://bugboard.dev/docs/api-reference).
+  Changes to that contract must be discussed in an issue first — an SDK doesn't diverge from the
+  API on its own.
 - **Security issues** — never open a public issue; see [SECURITY.md](SECURITY.md).
 
 ## Development setup
@@ -46,9 +45,9 @@ Keep these invariants in mind; they are what make the SDK safe to embed in other
 
 1. **Never throw into the host app.** Every public method is fire-and-forget; failures go to
    the debug logger.
-2. **No dependencies on the default path.** Only platform APIs (`fetch`, WebCrypto). The
-   sealed-box binding (`tweetnacl-sealedbox-js`) is a bundled dependency, lazy-loaded only when
-   payload encryption is enabled — apps that never encrypt load nothing extra.
+2. **Nothing loads on the default path.** Only platform APIs (`fetch`, WebCrypto). The sealed-box
+   binding (`tweetnacl-sealedbox-js`) is the single bundled dependency and is lazy-loaded via a
+   dynamic import only when payload encryption is enabled — importing the SDK pulls in nothing.
 3. **Never log key material.** The logger redacts secrets; keep it that way.
 4. **The 16 reporting methods are generated**, not hand-written — extend the severity/priority
    tables in `src/types.ts` rather than adding one-off methods.
@@ -92,7 +91,10 @@ ci: run tests on Node 24
 ## Releases
 
 Maintainers cut releases. Versioning follows [SemVer](https://semver.org/); the changelog
-follows [Keep a Changelog](https://keepachangelog.com/).
+follows [Keep a Changelog](https://keepachangelog.com/). To release: bump the version in
+`package.json`, move the `[Unreleased]` changelog entries under the new version, tag (`vX.Y.Z`),
+and publish a GitHub Release — the release workflow builds, tests, and publishes to npm with
+provenance.
 
 ## Code of conduct
 

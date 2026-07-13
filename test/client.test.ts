@@ -72,6 +72,61 @@ describe('createClient', () => {
         });
     });
 
+    it('captures the caller file and line by default', async () => {
+        const { client, bodies } = clientWithMock();
+
+        client.criticalHigh('Payment error');
+        await client.flush();
+
+        expect(bodies[0]!.file_name).toContain('client.test.ts');
+        expect(typeof bodies[0]!.line_number).toBe('number');
+    });
+
+    it('captures the caller even from inside a catch or a callback', async () => {
+        const { client, bodies } = clientWithMock();
+
+        try {
+            throw new Error('boom');
+        } catch {
+            client.critical('caught');
+        }
+        await new Promise<void>((resolve) => {
+            setTimeout(() => {
+                client.minor('later');
+                resolve();
+            }, 0);
+        });
+        await client.flush();
+
+        expect(bodies).toHaveLength(2);
+        for (const body of bodies) {
+            expect(body.file_name).toContain('client.test.ts');
+            expect(body.line_number).toBeGreaterThan(0);
+        }
+    });
+
+    it('omits the call site when captureLocation is false', async () => {
+        const { client, bodies } = clientWithMock({ captureLocation: false });
+
+        client.criticalHigh('Payment error');
+        await client.flush();
+
+        expect(bodies[0]!.file_name).toBeUndefined();
+        expect(bodies[0]!.line_number).toBeUndefined();
+    });
+
+    it('lets beforeSend strip the call site', async () => {
+        const { client, bodies } = clientWithMock({
+            beforeSend: ({ file_name: _f, line_number: _l, ...rest }) => rest,
+        });
+
+        client.criticalHigh('Payment error');
+        await client.flush();
+
+        expect(bodies[0]!.file_name).toBeUndefined();
+        expect(bodies[0]!.line_number).toBeUndefined();
+    });
+
     it('sends nothing when disabled', async () => {
         const { client, fetchMock } = clientWithMock({ enabled: false });
 

@@ -11,4 +11,4 @@
 - [ ] README updated if user-facing behavior changed
 - [ ] `CHANGELOG.md` entry added under `## [Unreleased]`
 - [ ] Commits follow Conventional Commits **without scopes** (`feat:`, not `feat(x):`)
-- [ ] No change to the shared wire contract (or a spec discussion is linked)
+- [ ] No change to the wire contract (or a discussion issue is linked)

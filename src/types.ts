@@ -25,7 +25,7 @@ export type PrioritySuffix = keyof typeof PRIORITY_SUFFIXES;
 /** The 16 reporting method names: `critical`, `criticalLow`, … `minorHigh`. */
 export type ReportMethodName = `${Severity}${PrioritySuffix}`;
 
-/** Tags accept an array (`['ui', 'android']`) or a CSV string (`'ui,android'`). */
+/** Tags accept an array (`['ui', 'checkout']`) or a CSV string (`'ui,checkout'`). */
 export type TagsInput = readonly string[] | string;
 
 /**
@@ -46,15 +46,19 @@ export interface ReportPayload {
     title: string;
     description?: string;
     tags: string[];
+    /** File of the code that made the reporting call (auto-captured). */
+    file_name?: string;
+    /** Line of the code that made the reporting call (auto-captured). */
+    line_number?: number;
 }
 
 /**
  * Client configuration. Provide **either** `apiKey` (publishable key, bearer
- * auth — browsers/mobile) **or** `keyId` + `signingSecret` (secret key, HMAC
+ * auth — client-side code) **or** `keyId` + `signingSecret` (secret key, HMAC
  * auth — servers). The SDK picks the auth scheme from which is set.
  */
 export interface BugBoardConfig {
-    /** Publishable key (`bb_pub_…`) sent as a bearer token. Browser/mobile only. */
+    /** Publishable key (`bb_pub_…`) sent as a bearer token. Client-side only. */
     apiKey?: string;
     /** Public key id (`bbk_…`) identifying which secret key signed the request. */
     keyId?: string;
@@ -72,6 +76,12 @@ export interface BugBoardConfig {
     release?: string;
     /** Tags merged into every card. */
     defaultTags?: readonly string[];
+    /**
+     * Auto-capture the file and line of each reporting call (sent as
+     * `file_name`/`line_number`). Defaults to `true`; set `false` to skip
+     * reading the call stack.
+     */
+    captureLocation?: boolean;
     /** Probability (0–1) that a report is sent. Sample under load to stay within limits. */
     sampleRate?: number;
     /** Queue cap. Overflow drops the newest report (counted in debug output). */
@@ -91,11 +101,18 @@ export interface BugBoardConfig {
     /** When true, reports are logged locally instead of being sent. Useful for local debugging. */
     logLocally?: boolean;
     /**
-     * Override the ingestion endpoint.
+     * Ask the server to leave the created card out of its response, so a report
+     * isn't echoed back in plaintext where the network tab can read it. Defaults
+     * to `true`; set `false` to receive the full response body.
+     */
+    hideApiResponse?: boolean;
+    /**
+     * Override the ingestion origin, e.g. `http://localhost:8000`. Only the
+     * origin is used — the SDK appends `/api/v1/tasks` itself.
      *
      * @internal For SDK tests only — production clients always target BugBoard.
      */
-    endpoint?: string;
+    baseUrl?: string;
 }
 
 /**

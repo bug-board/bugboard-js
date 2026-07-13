@@ -5,9 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Note: the wire contract (request format, auth, the 16 reporting methods) is shared by
-        every BugBoard SDK and defined by the API reference — proposals that change it need a
-        spec discussion first, not just an SDK change.
+        Note: the wire contract (request format, auth, the 16 reporting methods) is defined by the
+        API reference — proposals that change it need a discussion first, not just an SDK change.
   - type: textarea
     id: problem
     attributes:

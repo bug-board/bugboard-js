@@ -1,4 +1,5 @@
 import { resolveConfig } from './config';
+import { captureLocation } from './location';
 import { createLogger } from './logger';
 import { buildPayload } from './payload';
 import { createQueue } from './queue';
@@ -36,12 +37,25 @@ export function createClient(config: BugBoardConfig = {}): BugBoardClient {
         (title, description, tags) => {
             try {
                 if (!resolved.enabled) return;
+
+                // Capture the caller's file/line first, while the user's frame
+                // is still on the synchronous call stack.
+                const location = resolved.captureLocation ? captureLocation() : undefined;
+
                 if (resolved.sampleRate < 1 && Math.random() >= resolved.sampleRate) {
                     logger.debug('Report sampled out.');
                     return;
                 }
 
-                let payload = buildPayload(severity, priority, title, description, tags, resolved);
+                let payload = buildPayload(
+                    severity,
+                    priority,
+                    title,
+                    description,
+                    tags,
+                    resolved,
+                    location,
+                );
 
                 if (resolved.beforeSend) {
                     const result = resolved.beforeSend(payload);
