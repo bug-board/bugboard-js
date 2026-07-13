@@ -91,7 +91,10 @@ ci: run tests on Node 24
 ## Releases
 
 Maintainers cut releases. Versioning follows [SemVer](https://semver.org/); the changelog
-follows [Keep a Changelog](https://keepachangelog.com/).
+follows [Keep a Changelog](https://keepachangelog.com/). To release: bump the version in
+`package.json`, move the `[Unreleased]` changelog entries under the new version, tag (`vX.Y.Z`),
+and publish a GitHub Release — the release workflow builds, tests, and publishes to npm with
+provenance.
 
 ## Code of conduct
 
