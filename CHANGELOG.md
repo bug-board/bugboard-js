@@ -7,14 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- The internal `endpoint` option is now `baseUrl` and takes an origin (`http://localhost:8000`,
-  trailing slash optional) instead of the full ingestion URL — the SDK appends `/api/v1/tasks`
-  itself. Only the origin is honored; a base URL that isn't absolute warns and falls back to
-  `https://bugboard.dev`.
-
-## [0.1.0] - 2026-07-02
+## [1.0.0] - 2026-07-13
 
 ### Added
 
@@ -33,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional payload encryption via libsodium-compatible sealed boxes
   (`tweetnacl-sealedbox-js`, a bundled dependency that is lazy-loaded only when encryption is
   enabled).
+- `baseUrl` option for pointing the SDK at a different BugBoard origin
+  (`http://localhost:8000`, trailing slash optional) — the SDK appends `/api/v1/tasks` itself.
+  A base URL that isn't absolute warns and falls back to `https://bugboard.dev`.
 
-[unreleased]: https://github.com/bug-board/bugboard-js/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/bug-board/bugboard-js/releases/tag/v0.1.0
+[unreleased]: https://github.com/bug-board/bugboard-js/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/bug-board/bugboard-js/releases/tag/v1.0.0

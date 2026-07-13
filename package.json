@@ -1,6 +1,6 @@
 {
   "name": "bugboard",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Official BugBoard SDK for JavaScript and TypeScript — report errors as cards on your project board from Node, the browser, or the edge.",
   "keywords": [
     "bugboard",
