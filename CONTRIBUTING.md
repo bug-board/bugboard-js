@@ -15,7 +15,7 @@ idea to merged pull request.
 
 ## Development setup
 
-You need Node 18+ (Node 22 recommended) and npm.
+You need Node 20+ (Node 22 recommended) and npm.
 
 ```bash
 git clone https://github.com/bug-board/bugboard-js.git
@@ -83,7 +83,7 @@ ci: run tests on Node 24
 
 ## Pull request expectations
 
-- CI must be green (lint, typecheck, tests on Node 18/20/22, build).
+- CI must be green (lint, typecheck, tests on Node 20/22/24, build).
 - New behavior is documented and tested.
 - Breaking changes are called out explicitly in the PR description.
 - One approving review is required before merge.
