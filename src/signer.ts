@@ -8,7 +8,7 @@
  *     payload   = timestamp + "." + UPPERCASE(method) + "." + path + "." + sha256_hex(body)
  *     signature = hmac_sha256_hex(key = signingSecret, message = payload)
  *
- * WebCrypto (`crypto.subtle`) is used so the same code runs on Node 18+,
+ * WebCrypto (`crypto.subtle`) is used so the same code runs on Node 20+,
  * browsers, and edge runtimes.
  */
 
@@ -17,8 +17,8 @@ const encoder = new TextEncoder();
 let subtlePromise: Promise<SubtleCrypto> | undefined;
 
 /**
- * Browsers, edge runtimes, and Node 19+ expose WebCrypto as a global; Node 18
- * only ships it under `node:crypto`, so fall back to a lazy import there.
+ * Browsers and edge runtimes expose WebCrypto as a global; on Node it is
+ * only guaranteed under `node:crypto`, so fall back to a lazy import there.
  */
 function getSubtle(): Promise<SubtleCrypto> {
     subtlePromise ??= globalThis.crypto?.subtle

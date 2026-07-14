@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 The official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report errors as
-**cards** on your project board — from Node 18+, browsers, and edge runtimes — built on the platform
+**cards** on your project board — from Node 20+, browsers, and edge runtimes — built on the platform
 `fetch`. Importing the SDK pulls in **nothing else**: the one bundled dependency is a sealed-box
 binding that is lazy-loaded only if you turn on payload encryption.
 
@@ -31,7 +31,7 @@ npm install bugboard
 ```
 
 There is nothing framework-specific to install. The SDK is a single framework-agnostic client that
-uses only platform APIs (`fetch`, WebCrypto), so the same package runs unchanged on Node 18+, in any
+uses only platform APIs (`fetch`, WebCrypto), so the same package runs unchanged on Node 20+, in any
 browser or bundler (Vite, webpack, Next.js, Nuxt…), and on edge runtimes (Cloudflare Workers, Vercel
 Edge, Deno). It ships ESM + CJS builds with full TypeScript types.
 
