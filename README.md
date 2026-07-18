@@ -30,6 +30,22 @@ try {
 Reporting is **fire-and-forget**: the call returns immediately, delivery happens on a background
 queue with retries and backoff, and the SDK **never throws into your app**.
 
+> 📖 **[Usage guide](docs/USAGE.md)** — in-depth integration for Express, Fastify, NestJS, Next.js,
+> Nuxt, SvelteKit, Remix, Vite SPAs, and serverless/edge runtimes, plus flushing semantics, testing,
+> and troubleshooting.
+
+## Contents
+
+- [Installation](#installation)
+- [Setup](#setup) — [browser](#browser--client-side-publishable-key) · [server](#server--node-secret-key) · [env var names](#framework-environment-variables)
+- [Usage](#usage) — [the 16 methods](#the-16-reporting-methods) · [serverless flushing](#serverless--short-lived-scripts)
+- [Configuration](#configuration)
+- [Encrypting sensitive reports](#encrypting-sensitive-reports)
+- [Delivery semantics](#delivery-semantics) — retries, dedup, quotas
+- [TypeScript](#typescript)
+- [Error types](#error-types)
+- [Contributing](#contributing) · [License](#license)
+
 ## Installation
 
 ```bash
