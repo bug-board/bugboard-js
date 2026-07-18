@@ -52,9 +52,9 @@ Every one takes the same arguments:
 
 ```ts
 bugboard.criticalHigh(
-  'Payment capture failed',   // string — required, clamped to 255 chars
-  err,                        // string | Error | unknown — optional
-  ['payments', 'stripe'],     // string[] | 'csv,string' — optional
+  'Payment capture failed', // string — required, clamped to 255 chars
+  err, // string | Error | unknown — optional
+  ['payments', 'stripe'], // string[] | 'csv,string' — optional
 );
 ```
 
@@ -305,8 +305,8 @@ response go out immediately while the runtime keeps the invocation alive for the
 
 ## Framework guides
 
-The client is identical across all of these. What changes is *where you construct it*, *which key
-you use*, and *where you flush*.
+The client is identical across all of these. What changes is _where you construct it_, _which key
+you use_, and _where you flush_.
 
 ### Node: Express, Fastify, Koa
 
@@ -357,11 +357,10 @@ in practice, and it's the single most valuable habit in a server integration.
 fastify.setErrorHandler((error, request, reply) => {
   // Don't report 4xx — those are client mistakes, not your bugs.
   if ((error.statusCode ?? 500) >= 500) {
-    bugboard.criticalHigh(
-      `Unhandled error: ${request.method} ${request.routeOptions.url}`,
-      error,
-      ['fastify', 'unhandled'],
-    );
+    bugboard.criticalHigh(`Unhandled error: ${request.method} ${request.routeOptions.url}`, error, [
+      'fastify',
+      'unhandled',
+    ]);
   }
 
   reply.status(error.statusCode ?? 500).send({ error: 'Internal Server Error' });
@@ -576,7 +575,7 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
 ```
 
 In production, a server component error reaching the client is redacted to a generic message plus a
-`digest`. So `error.message` from `error.tsx` is often unhelpful, and the *useful* report is the
+`digest`. So `error.message` from `error.tsx` is often unhelpful, and the _useful_ report is the
 server-side one — which is why the `instrumentation.ts` hook below matters.
 
 **`instrumentation.ts`** catches server errors Next.js handles internally, before they're redacted:
@@ -611,10 +610,10 @@ else stays on the server:
 // nuxt.config.ts
 export default defineNuxtConfig({
   runtimeConfig: {
-    bugboardKeyId: '',        // NUXT_BUGBOARD_KEY_ID — server only
+    bugboardKeyId: '', // NUXT_BUGBOARD_KEY_ID — server only
     bugboardSigningSecret: '', // NUXT_BUGBOARD_SIGNING_SECRET — server only
     public: {
-      bugboardApiKey: '',     // NUXT_PUBLIC_BUGBOARD_API_KEY — client
+      bugboardApiKey: '', // NUXT_PUBLIC_BUGBOARD_API_KEY — client
     },
   },
 });
@@ -935,7 +934,7 @@ export default {
 };
 ```
 
-In Workers the client must be created *inside* `fetch` — bindings like `env` aren't available at
+In Workers the client must be created _inside_ `fetch` — bindings like `env` aren't available at
 module scope. This is the one place the "build it once at module scope" rule doesn't apply.
 
 **Vercel Edge Functions** work the same way, with `waitUntil` from `@vercel/functions`:
@@ -1001,29 +1000,29 @@ for await (const job of queue) {
 
 ## Configuration reference
 
-| Option                | Type       | Default                | Purpose                                                                       |
-| --------------------- | ---------- | ---------------------- | ----------------------------------------------------------------------------- |
-| `apiKey`              | `string`   | —                      | Publishable key (`bb_pub_…`), bearer auth. Browser / client-side.             |
-| `keyId`               | `string`   | —                      | Public key id (`bbk_…`) for HMAC auth. Servers.                               |
-| `signingSecret`       | `string`   | —                      | Signing secret (`bb_sec_…`). Never transmitted.                               |
-| `encryptionPublicKey` | `string`   | —                      | Base64 X25519 public key. When set, every payload is sealed in transit.       |
-| `encryptionKeyId`     | `string`   | —                      | `bbek_…` id echoed in the envelope (enables key rotation).                    |
-| `enabled`             | `boolean`  | `true`                 | Master switch. Forced to `false` when no credentials are set.                 |
-| `environment`         | `string`   | —                      | Added to every card as tag `env:<value>`.                                     |
-| `release`             | `string`   | —                      | Added to every card as tag `release:<value>`.                                 |
-| `defaultTags`         | `string[]` | `[]`                   | Merged into every card's tags.                                                |
-| `captureLocation`     | `boolean`  | `true`                 | Auto-capture the caller's file/line as `file_name`/`line_number`.             |
-| `sampleRate`          | `number`   | `1.0`                  | Probability (0–1) a report is sent. Clamped into range.                       |
-| `maxQueueSize`        | `number`   | `100`                  | Queue cap; overflow drops the **newest** report.                              |
-| `concurrency`         | `number`   | `3`                    | Parallel in-flight requests when draining.                                    |
-| `flushIntervalMs`     | `number`   | `2000`                 | Background drain cadence.                                                     |
-| `timeoutMs`           | `number`   | `5000`                 | Per-request timeout.                                                          |
-| `maxRetries`          | `number`   | `3`                    | Retries for 429/5xx/network errors (backoff + jitter, honors `Retry-After`).  |
-| `beforeSend`          | `function` | —                      | Scrub or veto: return the payload, or `null` to drop it.                      |
-| `debug`               | `boolean`  | `false`                | Verbose internal logging (keys always redacted).                              |
-| `logLocally`          | `boolean`  | `false`                | Log each report instead of sending it (dry run).                              |
-| `hideApiResponse`     | `boolean`  | `true`                 | Ask the server to omit the created card from its response.                    |
-| `baseUrl`             | `string`   | `https://bugboard.dev` | Ingestion origin override. **Internal — for SDK tests.**                      |
+| Option                | Type       | Default                | Purpose                                                                      |
+| --------------------- | ---------- | ---------------------- | ---------------------------------------------------------------------------- |
+| `apiKey`              | `string`   | —                      | Publishable key (`bb_pub_…`), bearer auth. Browser / client-side.            |
+| `keyId`               | `string`   | —                      | Public key id (`bbk_…`) for HMAC auth. Servers.                              |
+| `signingSecret`       | `string`   | —                      | Signing secret (`bb_sec_…`). Never transmitted.                              |
+| `encryptionPublicKey` | `string`   | —                      | Base64 X25519 public key. When set, every payload is sealed in transit.      |
+| `encryptionKeyId`     | `string`   | —                      | `bbek_…` id echoed in the envelope (enables key rotation).                   |
+| `enabled`             | `boolean`  | `true`                 | Master switch. Forced to `false` when no credentials are set.                |
+| `environment`         | `string`   | —                      | Added to every card as tag `env:<value>`.                                    |
+| `release`             | `string`   | —                      | Added to every card as tag `release:<value>`.                                |
+| `defaultTags`         | `string[]` | `[]`                   | Merged into every card's tags.                                               |
+| `captureLocation`     | `boolean`  | `true`                 | Auto-capture the caller's file/line as `file_name`/`line_number`.            |
+| `sampleRate`          | `number`   | `1.0`                  | Probability (0–1) a report is sent. Clamped into range.                      |
+| `maxQueueSize`        | `number`   | `100`                  | Queue cap; overflow drops the **newest** report.                             |
+| `concurrency`         | `number`   | `3`                    | Parallel in-flight requests when draining.                                   |
+| `flushIntervalMs`     | `number`   | `2000`                 | Background drain cadence.                                                    |
+| `timeoutMs`           | `number`   | `5000`                 | Per-request timeout.                                                         |
+| `maxRetries`          | `number`   | `3`                    | Retries for 429/5xx/network errors (backoff + jitter, honors `Retry-After`). |
+| `beforeSend`          | `function` | —                      | Scrub or veto: return the payload, or `null` to drop it.                     |
+| `debug`               | `boolean`  | `false`                | Verbose internal logging (keys always redacted).                             |
+| `logLocally`          | `boolean`  | `false`                | Log each report instead of sending it (dry run).                             |
+| `hideApiResponse`     | `boolean`  | `true`                 | Ask the server to omit the created card from its response.                   |
+| `baseUrl`             | `string`   | `https://bugboard.dev` | Ingestion origin override. **Internal — for SDK tests.**                     |
 
 ### Tuning by runtime
 
@@ -1036,7 +1035,7 @@ createClient({
   keyId: process.env.BUGBOARD_KEY_ID,
   signingSecret: process.env.BUGBOARD_SIGNING_SECRET,
   timeoutMs: 2000,
-  maxRetries: 1,       // 3 retries × backoff can add seconds to every invocation
+  maxRetries: 1, // 3 retries × backoff can add seconds to every invocation
   flushIntervalMs: 500, // less to drain when the explicit flush arrives
 });
 ```
@@ -1046,8 +1045,8 @@ createClient({
 ```ts
 createClient({
   apiKey: import.meta.env.VITE_BUGBOARD_API_KEY,
-  maxQueueSize: 30,  // bound memory; overflow drops the newest
-  sampleRate: 0.5,   // if you have real volume
+  maxQueueSize: 30, // bound memory; overflow drops the newest
+  sampleRate: 0.5, // if you have real volume
 });
 ```
 
@@ -1056,7 +1055,7 @@ createClient({
 Sampling is per report, evaluated before the payload is built
 ([`client.ts:45-48`](../src/client.ts#L45-L48)). Because dedup is server-side, sampling and dedup
 interact usefully: at `sampleRate: 0.1`, a bug that happens 1000 times still reliably produces its
-card — you just see an occurrence count of ~100. For a bug that happens *twice*, there's a good
+card — you just see an occurrence count of ~100. For a bug that happens _twice_, there's a good
 chance you see nothing.
 
 So: sample when your problem is volume from known-noisy paths, not to save quota generally. Start at
@@ -1113,7 +1112,7 @@ private key.
 export default createClient({
   apiKey: import.meta.env.VITE_BUGBOARD_API_KEY,
   encryptionPublicKey: import.meta.env.VITE_BUGBOARD_ENCRYPTION_PUBLIC_KEY, // base64 X25519
-  encryptionKeyId: import.meta.env.VITE_BUGBOARD_ENCRYPTION_KEY_ID,         // bbek_…
+  encryptionKeyId: import.meta.env.VITE_BUGBOARD_ENCRYPTION_KEY_ID, // bbek_…
 });
 ```
 
@@ -1134,14 +1133,14 @@ Everything is typed, including all 16 method names:
 
 ```ts
 import type {
-  BugBoardClient,   // the client: 16 report methods + flush()
-  BugBoardConfig,   // every option in the table above
-  ReportPayload,    // what beforeSend receives and returns
-  ReportFn,         // (title, description?, tags?) => void
+  BugBoardClient, // the client: 16 report methods + flush()
+  BugBoardConfig, // every option in the table above
+  ReportPayload, // what beforeSend receives and returns
+  ReportFn, // (title, description?, tags?) => void
   ReportMethodName, // 'critical' | 'criticalLow' | … the 16 names
-  Severity,         // 'critical' | 'major' | 'moderate' | 'minor'
-  Priority,         // 'low' | 'medium' | 'high'
-  TagsInput,        // readonly string[] | string
+  Severity, // 'critical' | 'major' | 'moderate' | 'minor'
+  Priority, // 'low' | 'medium' | 'high'
+  TagsInput, // readonly string[] | string
 } from 'bugboard';
 ```
 
@@ -1212,11 +1211,9 @@ it('reports a failed payment', async () => {
 
   await new CheckoutService(bugboard).charge(failingOrder);
 
-  expect(bugboard.criticalHigh).toHaveBeenCalledWith(
-    'Payment capture failed',
-    expect.any(Error),
-    ['payments'],
-  );
+  expect(bugboard.criticalHigh).toHaveBeenCalledWith('Payment capture failed', expect.any(Error), [
+    'payments',
+  ]);
 });
 ```
 
@@ -1255,7 +1252,7 @@ Work down this list:
 6. **Queue full.** Debug prints `Queue full (100); report dropped (N dropped so far).`
 7. **Quota exhausted.** The server accepted and dropped it — by design, and never retried.
 8. **Auth rejected.** Debug shows a 401/403. Check the key is for the right project, hasn't been
-   revoked, and is the right *type* — a secret key's `keyId` in the `apiKey` field will not work.
+   revoked, and is the right _type_ — a secret key's `keyId` in the `apiKey` field will not work.
 
 ### Reports arrive but the card count doesn't go up
 
