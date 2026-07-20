@@ -112,8 +112,8 @@ BUGBOARD_SIGNING_SECRET=bb_sec_xxxxxxxx
 
 ## Usage
 
-Call a severity method with a **title** (required); optionally pass a description — a string or
-the caught error — and tags (an array or a CSV string):
+Call a severity method with a **title** (required); optionally pass a description — a string, the
+caught error, or any value — and tags (an array or a CSV string):
 
 ```ts
 import bugboard from '@/utils/bugboard';
@@ -122,6 +122,7 @@ bugboard.major('Checkout is slow'); // a title is all you need
 bugboard.critical('Payment failed', err); // attach the caught error
 bugboard.critical('Payment failed', err, ['payments', 'checkout']);
 bugboard.critical('Payment failed', err, 'payments,checkout');
+bugboard.major('Bad payload', { userId, cart }); // objects are pretty-printed as JSON
 ```
 
 ### The 16 reporting methods
@@ -218,8 +219,13 @@ to embed in client code; the private key never leaves BugBoard.
 - **Deduplication is server-side**: a report whose title or description exactly matches an
   existing card increments its occurrence count instead of creating a duplicate — so use stable,
   deterministic titles (no timestamps or UUIDs in the title).
-- **Quota drops are silent by design**: when the project's monthly quota is exhausted the server
-  accepts and drops the report — the SDK logs it in debug mode and does not retry.
+- **Quota drops are silent by design**: when the project's event allowance is exhausted — or the
+  project is paused or archived — the server accepts and drops the report. It is logged, never
+  retried, and never thrown into your app.
+- **The SDK then stops sending**: after a drop it discards reports locally instead of sending them,
+  until the drop is expected to have cleared (the next midnight UTC for a spent allowance, 30
+  minutes for a paused or archived project). One report is let through afterwards to check, so
+  reporting resumes on its own. Nothing to configure.
 
 ## TypeScript
 

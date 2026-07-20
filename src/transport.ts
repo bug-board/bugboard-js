@@ -9,6 +9,8 @@ import {
     BugBoardValidationError,
 } from './errors';
 import type { Logger } from './logger';
+import type { QuotaGate } from './quota';
+import { readDropReason } from './quota';
 import type { ReportPayload } from './types';
 import { bearerHeaders, signedHeaders } from './signer';
 
@@ -78,7 +80,11 @@ function isRetryable(error: BugBoardError): boolean {
     return error instanceof BugBoardRateLimitError || error instanceof BugBoardServerError;
 }
 
-export function createTransport(config: ResolvedConfig, logger: Logger): Transport {
+export function createTransport(
+    config: ResolvedConfig,
+    logger: Logger,
+    quota: QuotaGate,
+): Transport {
     /**
      * Serialize (and optionally encrypt) the body once per report; the same
      * bytes are transmitted on every attempt. Auth is applied per attempt so
@@ -136,10 +142,12 @@ export function createTransport(config: ResolvedConfig, logger: Logger): Transpo
 
         if (response.ok) {
             const data = await parseJson(response);
-            if (data.quota_exceeded === true) {
-                // Not an error: the monthly quota is exhausted and the server
-                // accepted-then-dropped the report. Never retried (§6).
-                logger.warn("Report dropped: the project's monthly quota is exhausted.");
+            const dropped = readDropReason(data);
+            if (dropped !== undefined) {
+                // Not an error: the server accepted the report and discarded it.
+                // Never retried (§6) — and the gate stops us sending the next one
+                // at all, since it would meet the same fate.
+                quota.arm(dropped);
             } else if (data.deduplicated === true) {
                 logger.debug('Report deduplicated into an existing card.');
             } else {
@@ -158,6 +166,10 @@ export function createTransport(config: ResolvedConfig, logger: Logger): Transpo
                 logger.log('Report (log-only, not sent):', JSON.stringify(payload, null, 2));
                 return;
             }
+
+            // The server is discarding everything it receives right now, so this
+            // report would cost a round trip and be thrown away at the far end.
+            if (quota.shouldDiscard()) return;
 
             const body = await prepareBody(payload);
             const maxRetries = options.keepalive ? 0 : config.maxRetries;

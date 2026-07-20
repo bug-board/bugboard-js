@@ -68,6 +68,115 @@ describe('buildPayload', () => {
         expect(payload.description?.indexOf('boom')).toBe(payload.description?.lastIndexOf('boom'));
     });
 
+    it('pretty-prints objects and arrays with a two-space indent', () => {
+        const payload = buildPayload(
+            'minor',
+            'low',
+            'T',
+            { a: 1, b: [1, 2] },
+            undefined,
+            noContext,
+        );
+
+        expect(payload.description).toBe('{\n  "a": 1,\n  "b": [\n    1,\n    2\n  ]\n}');
+    });
+
+    it.each([
+        [true, 'true'],
+        [false, 'false'],
+        [0, '0'],
+        [1.0, '1'],
+        [0.1 + 0.2, '0.30000000000000004'],
+        [1e25, '1e+25'],
+        [1e-7, '1e-7'],
+        [NaN, 'NaN'],
+        [Infinity, 'Infinity'],
+        [-Infinity, '-Infinity'],
+    ])('stringifies the scalar %p as %p', (input, expected) => {
+        const payload = buildPayload('minor', 'low', 'T', input, undefined, noContext);
+
+        expect(payload.description).toBe(expected);
+    });
+
+    it('omits an empty-string description but keeps a false one', () => {
+        // String(false) is "false", not "" — a false description must survive.
+        expect(
+            buildPayload('minor', 'low', 'T', '', undefined, noContext).description,
+        ).toBeUndefined();
+        expect(buildPayload('minor', 'low', 'T', false, undefined, noContext).description).toBe(
+            'false',
+        );
+    });
+
+    it('replaces a cycle without discarding the rest of the object', () => {
+        const cyclic: Record<string, unknown> = { a: 1 };
+        cyclic.self = cyclic;
+
+        const { description } = buildPayload('minor', 'low', 'T', cyclic, undefined, noContext);
+
+        expect(description).toContain('"a": 1');
+        expect(description).toContain('[Circular]');
+    });
+
+    it('keeps repeated but acyclic references intact', () => {
+        const shared = { x: 1 };
+
+        const { description } = buildPayload(
+            'minor',
+            'low',
+            'T',
+            { p: shared, q: shared },
+            undefined,
+            noContext,
+        );
+
+        expect(description).not.toContain('[Circular]');
+    });
+
+    it('extracts an Error nested in a context object instead of rendering it as {}', () => {
+        const { description } = buildPayload(
+            'minor',
+            'low',
+            'T',
+            { ctx: 'checkout', err: new Error('nested boom') },
+            undefined,
+            noContext,
+        );
+
+        expect(description).toContain('nested boom');
+        expect(description).toContain('"ctx": "checkout"');
+    });
+
+    it('survives bigints, functions, Maps, and Sets', () => {
+        const { description } = buildPayload(
+            'minor',
+            'low',
+            'T',
+            { n: 10n, fn: function named() {}, m: new Map([['a', 1]]), s: new Set([1, 2]) },
+            undefined,
+            noContext,
+        );
+
+        expect(description).toContain('"10n"');
+        expect(description).toContain('[Function named]');
+        expect(description).toContain('"a": 1');
+        expect(description).toContain('"s": [\n    1,\n    2\n  ]');
+    });
+
+    it('marks a truncated description and stays exactly within the cap', () => {
+        const { description } = buildPayload(
+            'minor',
+            'low',
+            'T',
+            { blob: 'x'.repeat(70_000) },
+            undefined,
+            noContext,
+        );
+
+        expect(description!.length).toBe(60_000);
+        expect(description!.endsWith('\n… truncated')).toBe(true);
+    });
+
     it('truncates oversized descriptions below the server cap', () => {
         const payload = buildPayload(
             'minor',
