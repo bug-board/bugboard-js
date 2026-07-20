@@ -69,7 +69,14 @@ describe('buildPayload', () => {
     });
 
     it('pretty-prints objects and arrays with a two-space indent', () => {
-        const payload = buildPayload('minor', 'low', 'T', { a: 1, b: [1, 2] }, undefined, noContext);
+        const payload = buildPayload(
+            'minor',
+            'low',
+            'T',
+            { a: 1, b: [1, 2] },
+            undefined,
+            noContext,
+        );
 
         expect(payload.description).toBe('{\n  "a": 1,\n  "b": [\n    1,\n    2\n  ]\n}');
     });
