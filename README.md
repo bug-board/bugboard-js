@@ -4,7 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/bugboard.svg)](https://www.npmjs.com/package/bugboard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report errors as **cards** on your project board — from Node 20+, browsers, and edge runtimes — built on the platform `fetch`. Importing the SDK pulls in **nothing else**: the one bundled dependency is a sealed-box binding that is lazy-loaded only if you turn on payload encryption.
+The official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report bugs as **cards** on your project board — from Node 20+, browsers, and edge runtimes — built on the platform `fetch`. Importing the SDK pulls in **nothing else**: the one bundled dependency is a sealed-box binding that is lazy-loaded only if you turn on payload encryption.
 
 <div align="center">
 
