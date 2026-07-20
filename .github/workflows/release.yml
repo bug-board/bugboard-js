@@ -1,9 +1,15 @@
-# Publishes the package to npm when a GitHub Release is published.
+# Publishes the package to npm when a release is published on GitHub.
 #
-# One-time setup: create an npm automation token (npmjs.com → Access Tokens →
-# Granular, with publish rights on "bugboard") and add it to this repository as
-# the NPM_TOKEN actions secret. `--provenance` links the published tarball back
-# to this workflow run so consumers can verify where it was built.
+# Releasing is manual: bump package.json and the CHANGELOG, merge to main, then
+# draft a release on github.com with a new v* tag and publish it.
+#
+# Auth is npm trusted publishing (OIDC) — there is no NPM_TOKEN and no secret to
+# rotate. npm mints a short-lived credential scoped to this workflow, which is
+# why the `id-token: write` permission below is load-bearing.
+#
+# One-time setup on npmjs.com/package/bugboard/access → Trusted Publisher:
+#   organisation: bug-board   repository: bugboard-js   workflow: release.yml
+# Renaming this file breaks publishing until that field is updated to match.
 name: Release
 
 on:
@@ -12,7 +18,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # required for npm provenance
+  id-token: write # required to mint the OIDC token npm authenticates with
 
 jobs:
   publish:
@@ -25,8 +31,14 @@ jobs:
           node-version: 22
           cache: npm
           registry-url: https://registry.npmjs.org
+
+      # Node 22 bundles npm 10, which predates OIDC support. Trusted publishing
+      # needs npm >= 11.5.1, so upgrade before publishing.
+      - run: npm install -g npm@latest
+
       - run: npm ci
       - run: npm test
+
       - name: Check tag matches package.json version
         run: |
           pkg="$(node -p "require('./package.json').version")"
@@ -35,6 +47,5 @@ jobs:
             echo "Tag v$tag does not match package.json version $pkg" >&2
             exit 1
           fi
+
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
