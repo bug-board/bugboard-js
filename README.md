@@ -219,8 +219,13 @@ to embed in client code; the private key never leaves BugBoard.
 - **Deduplication is server-side**: a report whose title or description exactly matches an
   existing card increments its occurrence count instead of creating a duplicate — so use stable,
   deterministic titles (no timestamps or UUIDs in the title).
-- **Quota drops are silent by design**: when the project's monthly quota is exhausted the server
-  accepts and drops the report — the SDK logs it in debug mode and does not retry.
+- **Quota drops are silent by design**: when the project's event allowance is exhausted — or the
+  project is paused or archived — the server accepts and drops the report. It is logged, never
+  retried, and never thrown into your app.
+- **The SDK then stops sending**: after a drop it discards reports locally instead of sending them,
+  until the drop is expected to have cleared (the next midnight UTC for a spent allowance, 30
+  minutes for a paused or archived project). One report is let through afterwards to check, so
+  reporting resumes on its own. Nothing to configure.
 
 ## TypeScript
 

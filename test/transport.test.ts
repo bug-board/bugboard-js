@@ -8,6 +8,7 @@ import {
     BugBoardValidationError,
 } from '../src/errors';
 import { createLogger } from '../src/logger';
+import { createQuotaGate } from '../src/quota';
 import { signedHeaders } from '../src/signer';
 import { createTransport } from '../src/transport';
 import type { ReportPayload } from '../src/types';
@@ -23,7 +24,7 @@ const silentLogger = createLogger(false, []);
 
 function transportWith(config: Parameters<typeof resolveConfig>[0] = {}) {
     const { resolved } = resolveConfig({ apiKey: 'bb_pub_test', ...config });
-    return createTransport(resolved, silentLogger);
+    return createTransport(resolved, silentLogger, createQuotaGate(silentLogger));
 }
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}) {
@@ -118,7 +119,8 @@ describe('transport', () => {
 
         const { resolved } = resolveConfig({ apiKey: 'bb_pub_test', logLocally: true });
         // debug is false, so the logLocally channel must still emit.
-        await settle(createTransport(resolved, createLogger(false, [])).send(payload));
+        const logger = createLogger(false, []);
+        await settle(createTransport(resolved, logger, createQuotaGate(logger)).send(payload));
 
         expect(fetchMock).not.toHaveBeenCalled();
         expect(logSpy).toHaveBeenCalledTimes(1);
@@ -202,11 +204,12 @@ describe('transport', () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
         const { resolved } = resolveConfig({ apiKey: 'bb_pub_test' });
-        await settle(createTransport(resolved, createLogger(true, [])).send(payload));
+        const logger = createLogger(true, []);
+        await settle(createTransport(resolved, logger, createQuotaGate(logger)).send(payload));
 
         // A hidden response carries no `data`, but the control flags survive (§5).
         expect(warnSpy).toHaveBeenCalledTimes(1);
-        expect((warnSpy.mock.calls[0] as unknown[]).join(' ')).toContain('quota is exhausted');
+        expect((warnSpy.mock.calls[0] as unknown[]).join(' ')).toContain('allowance is exhausted');
 
         warnSpy.mockRestore();
     });

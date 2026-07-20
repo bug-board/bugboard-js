@@ -1297,7 +1297,10 @@ Work down this list:
 4. **Sampled out.** Debug prints `Report sampled out.`
 5. **Dropped by `beforeSend`.** Debug prints `Report dropped by beforeSend.`
 6. **Queue full.** Debug prints `Queue full (100); report dropped (N dropped so far).`
-7. **Quota exhausted.** The server accepted and dropped it — by design, and never retried.
+7. **Quota exhausted, or the project is paused/archived.** Debug prints `Report dropped by the
+   server: …`, naming the cause and when reporting resumes. The server accepted and dropped it — by
+   design, and never retried. Reports after that print `Report discarded locally: suppressed until
+   …`; the SDK has stopped sending on purpose and will resume on its own.
 8. **Auth rejected.** Debug shows a 401/403. Check the key is for the right project, hasn't been
    revoked, and is the right _type_ — a secret key's `keyId` in the `apiKey` field will not work.
 

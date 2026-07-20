@@ -3,6 +3,7 @@ import { captureLocation } from './location';
 import { createLogger } from './logger';
 import { buildPayload } from './payload';
 import { createQueue } from './queue';
+import { createQuotaGate } from './quota';
 import { registerShutdownFlush } from './shutdown';
 import { createTransport } from './transport';
 import type { BugBoardClient, BugBoardConfig, ReportFn, ReportMethodName } from './types';
@@ -28,7 +29,8 @@ export function createClient(config: BugBoardConfig = {}): BugBoardClient {
     const logger = createLogger(resolved.debug, [config.signingSecret, config.apiKey]);
     for (const warning of warnings) logger.warn(warning);
 
-    const transport = createTransport(resolved, logger);
+    const quota = createQuotaGate(logger);
+    const transport = createTransport(resolved, logger, quota);
     const queue = createQueue(resolved, transport, logger);
     registerShutdownFlush(queue);
 
@@ -37,6 +39,11 @@ export function createClient(config: BugBoardConfig = {}): BugBoardClient {
         (title, description, tags) => {
             try {
                 if (!resolved.enabled) return;
+
+                // Checked here as well as in the transport so a suppressed
+                // report costs nothing at all: no payload building, and no
+                // queue slot that a deliverable report could have used.
+                if (quota.shouldDiscard()) return;
 
                 // Capture the caller's file/line first, while the user's frame
                 // is still on the synchronous call stack.
