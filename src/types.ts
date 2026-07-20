@@ -32,7 +32,8 @@ export type TagsInput = readonly string[] | string;
  * One reporting call: `method(title, description?, tags?)`.
  *
  * - `title` — required; clamped to 255 characters.
- * - `description` — a string or a caught `Error` (message + stack are extracted).
+ * - `description` — anything. A caught `Error` contributes its message + stack;
+ *   objects and arrays are pretty-printed as JSON; scalars are stringified.
  * - `tags` — an array or a CSV string; each tag is clamped to 50 characters.
  *
  * Reporting is fire-and-forget: the call returns immediately and never throws.

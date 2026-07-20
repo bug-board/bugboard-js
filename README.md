@@ -112,8 +112,8 @@ BUGBOARD_SIGNING_SECRET=bb_sec_xxxxxxxx
 
 ## Usage
 
-Call a severity method with a **title** (required); optionally pass a description — a string or
-the caught error — and tags (an array or a CSV string):
+Call a severity method with a **title** (required); optionally pass a description — a string, the
+caught error, or any value — and tags (an array or a CSV string):
 
 ```ts
 import bugboard from '@/utils/bugboard';
@@ -122,6 +122,7 @@ bugboard.major('Checkout is slow'); // a title is all you need
 bugboard.critical('Payment failed', err); // attach the caught error
 bugboard.critical('Payment failed', err, ['payments', 'checkout']);
 bugboard.critical('Payment failed', err, 'payments,checkout');
+bugboard.major('Bad payload', { userId, cart }); // objects are pretty-printed as JSON
 ```
 
 ### The 16 reporting methods

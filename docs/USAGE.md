@@ -10,6 +10,7 @@ lifecycle, and the gotchas specific to each one.
 ## Contents
 
 - [Core concepts](#core-concepts) — read this first, everything else builds on it
+- [What the description accepts](#what-the-description-accepts)
 - [Installation](#installation)
 - [Credentials: which key goes where](#credentials-which-key-goes-where)
 - [The shared client module](#the-shared-client-module)
@@ -53,12 +54,15 @@ Every one takes the same arguments:
 ```ts
 bugboard.criticalHigh(
   'Payment capture failed', // string — required, clamped to 255 chars
-  err, // string | Error | unknown — optional
+  err, // anything — optional; see "What the description accepts"
   ['payments', 'stripe'], // string[] | 'csv,string' — optional
 );
 ```
 
 Most applications only ever use the four medium methods: `critical`, `major`, `moderate`, `minor`.
+
+The description accepts **anything** — see
+[What the description accepts](#what-the-description-accepts).
 
 **2. Reporting is fire-and-forget and never throws.**
 
@@ -104,6 +108,42 @@ No credentials, an unparseable `baseUrl`, a `sampleRate` of `"high"` — none of
 config resolver applies a sane default or disables reporting, and pushes a warning that gets logged
 ([`config.ts:84-144`](../src/config.ts#L84-L144)). This is intentional, and it means **a
 misconfigured client is silent**. Turn on `debug` when reports aren't showing up.
+
+---
+
+## What the description accepts
+
+Pass whatever you already have — the SDK serializes it. There is no need to `JSON.stringify`
+first.
+
+| You pass             | You get on the card                                  |
+| -------------------- | ---------------------------------------------------- |
+| a string             | the string, unchanged                                |
+| an `Error`           | `message` + `stack`, without duplicating the message |
+| an object or array   | pretty-printed JSON, two-space indented              |
+| a scalar             | `true`, `false`, `0`, `1.5`, `NaN`, `Infinity`       |
+| `null` / `undefined` | the field is omitted entirely                        |
+
+```ts
+bugboard.major('Validation failed', { userId, cart, errors });
+```
+
+Values that a plain `JSON.stringify` mishandles are handled for you: circular references become
+`[Circular]` while the rest of the object survives, `bigint` and functions are rendered rather than
+thrown on, `Map`/`Set` are expanded, and an `Error` **nested inside** a context object contributes
+its stack instead of serializing to `{}` (its `message` and `stack` are non-enumerable, so a plain
+stringify drops them):
+
+```ts
+// "err" renders its full stack, not {}
+bugboard.minor('Checkout step failed', { step: 'capture', err: caught });
+```
+
+A description is clamped to 60 000 characters; anything longer ends with `… truncated`.
+
+> **Serialized descriptions vary per report.** Deduplication matches on title and description, so a
+> card whose description is a JSON dump of per-request data will not dedupe. Keep the title stable —
+> see [fact 4](#core-concepts).
 
 ---
 
@@ -853,9 +893,13 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    bugboard.criticalHigh(`React error: ${error.message}`, error, ['react']);
-    // componentStack is the useful part; append it to the description yourself
-    // if you want it: `${error.stack}\n\n${info.componentStack}`
+    // componentStack is the useful part. Pass both — a nested Error still
+    // contributes its full stack, so nothing is lost by wrapping it.
+    bugboard.criticalHigh(
+      `React error: ${error.message}`,
+      { error, componentStack: info.componentStack },
+      ['react'],
+    );
   }
 
   render() {
@@ -1088,7 +1132,9 @@ createClient({
 ```
 
 The payload shape is `ReportPayload` ([`types.ts:43-53`](../src/types.ts#L43-L53)) — `severity`,
-`priority`, `title`, `tags`, plus optional `description`, `file_name`, `line_number`.
+`priority`, `title`, `tags`, plus optional `description`, `file_name`, `line_number`. Note that
+`payload.description` is always a `string` (or absent) by the time the hook sees it: whatever you
+passed to the reporting call has already been serialized, so a scrubber can treat it as text.
 
 Keep the hook fast and total: it runs synchronously inside the reporting call. If it throws, the
 report is lost and the error goes to the debug channel — the backstop catches it, so your app is
@@ -1163,8 +1209,9 @@ export function report(bugboard: BugBoardClient, title: string, error: unknown):
 ```
 
 Note that `description` is typed `unknown`, not `Error` — pass a caught value straight through
-without narrowing it first. The SDK extracts message and stack when it is an `Error` and stringifies
-anything else.
+without narrowing it first. The SDK extracts message and stack when it is an `Error`, pretty-prints
+objects and arrays as JSON, and stringifies anything else. See
+[What the description accepts](#what-the-description-accepts).
 
 ---
 

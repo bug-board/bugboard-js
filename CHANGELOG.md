@@ -7,9 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Descriptions handle values a plain `JSON.stringify` mishandles: circular references become
+  `[Circular]` while the rest of the object survives, `bigint` and functions are rendered instead
+  of throwing, `Map`/`Set` are expanded, and an `Error` nested inside a context object contributes
+  its message and stack rather than serializing to `{}`.
+
 ### Changed
 
 - Minimum supported Node version raised to 20.
+- Stringified descriptions are pretty-printed with a two-space indent rather than compact JSON,
+  matching the PHP SDK byte for byte.
+- A description clamped to the 60 000-character limit now ends with `… truncated`.
+- Values that cannot be stringified report their constructor name (`[Request]`) instead of
+  `[object Object]`.
 
 ## [1.0.0] - 2026-07-13
 
