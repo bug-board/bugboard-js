@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Node 26 is now covered by CI alongside 20, 22 and 24. No source change was needed — the SDK
+  runs on platform `fetch` and WebCrypto, so this records that the runtime is verified rather
+  than assumed. The supported floor is unchanged at Node 20.
+
 ## [1.1.0] - 2026-07-20
 
 ### Added
