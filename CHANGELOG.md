@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An `examples/` directory with a runnable, single-file example for every usage mode — browser
+  publishable key, server HMAC, payload encryption, `beforeSend` scrubbing, serverless flushing,
+  process-level handlers, sampling, testing, and typed severity helpers — plus a Next.js
+  integration laid out as real files (server/client modules, route handler, error boundaries,
+  `instrumentation.ts`) and a React error boundary. Linked from the README.
 - Node 26 is now covered by CI alongside 20, 22 and 24. No source change was needed — the SDK
   runs on platform `fetch` and WebCrypto, so this records that the runtime is verified rather
   than assumed. The supported floor is unchanged at Node 20.
