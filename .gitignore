@@ -22,3 +22,6 @@ npm-debug.log*
 .vscode/
 *.swp
 *.tgz
+
+# Custom no-SDK reference implementation (local only, not shipped)
+CUSTOM_IMPLEMENTATION.md
