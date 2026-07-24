@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-07-24
+
 ### Added
 
 - An `examples/` directory with a runnable, single-file example for every usage mode — browser
@@ -74,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`http://localhost:8000`, trailing slash optional) — the SDK appends `/api/v1/tasks` itself.
   A base URL that isn't absolute warns and falls back to `https://bugboard.dev`.
 
-[unreleased]: https://github.com/bug-board/bugboard-js/compare/v1.1.0...HEAD
+[unreleased]: https://github.com/bug-board/bugboard-js/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/bug-board/bugboard-js/compare/v1.1.1...v1.1.2
 [1.1.0]: https://github.com/bug-board/bugboard-js/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/bug-board/bugboard-js/releases/tag/v1.0.0
