@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-07-24
+
+### Added
+
+- An `examples/` directory with a runnable, single-file example for every usage mode — browser
+  publishable key, server HMAC, payload encryption, `beforeSend` scrubbing, serverless flushing,
+  process-level handlers, sampling, testing, and typed severity helpers — plus a Next.js
+  integration laid out as real files (server/client modules, route handler, error boundaries,
+  `instrumentation.ts`) and a React error boundary. Linked from the README.
+- Node 26 is now covered by CI alongside 20, 22 and 24. No source change was needed — the SDK
+  runs on platform `fetch` and WebCrypto, so this records that the runtime is verified rather
+  than assumed. The supported floor is unchanged at Node 20.
+
 ## [1.1.0] - 2026-07-20
 
 ### Added
@@ -63,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`http://localhost:8000`, trailing slash optional) — the SDK appends `/api/v1/tasks` itself.
   A base URL that isn't absolute warns and falls back to `https://bugboard.dev`.
 
-[unreleased]: https://github.com/bug-board/bugboard-js/compare/v1.1.0...HEAD
+[unreleased]: https://github.com/bug-board/bugboard-js/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/bug-board/bugboard-js/compare/v1.1.1...v1.1.2
 [1.1.0]: https://github.com/bug-board/bugboard-js/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/bug-board/bugboard-js/releases/tag/v1.0.0

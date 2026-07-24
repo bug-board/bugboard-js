@@ -6,15 +6,6 @@
 
 The official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report bugs as **cards** on your project board — from Node 20+, browsers, and edge runtimes — built on the platform `fetch`. Importing the SDK pulls in **nothing else**: the one bundled dependency is a sealed-box binding that is lazy-loaded only if you turn on payload encryption.
 
-<div align="center">
-
-# 🚧 WORK IN PROGRESS 🚧
-
-**[BugBoard.dev](https://bugboard.dev) and its SDKs are currently under active development.**
-🚨 **Please do not use this package for anything right now.** 🚨
-**Once an official release is published, it will be available for everyone.**
-</div>
-
 ```ts
 import { createClient } from 'bugboard';
 
@@ -33,10 +24,15 @@ queue with retries and backoff, and the SDK **never throws into your app**.
 > 📖 **[Usage guide](docs/USAGE.md)** — in-depth integration for Express, Fastify, NestJS, Next.js,
 > Nuxt, SvelteKit, Remix, Vite SPAs, and serverless/edge runtimes, plus flushing semantics, testing,
 > and troubleshooting.
+>
+> 📁 **[Examples](examples/)** — copy-paste-ready files for every usage mode: browser publishable
+> key, server HMAC, encryption, `beforeSend` scrubbing, serverless flushing, process handlers,
+> [Next.js](examples/09-nextjs/), React error boundaries, testing, and typed helpers.
 
 ## Contents
 
 - [Installation](#installation)
+- [Examples](examples/) — runnable, one file per usage mode
 - [Setup](#setup) — [browser](#browser--client-side-publishable-key) · [server](#server--node-secret-key) · [env var names](#framework-environment-variables)
 - [Usage](#usage) — [the 16 methods](#the-16-reporting-methods) · [serverless flushing](#serverless--short-lived-scripts)
 - [Configuration](#configuration)
