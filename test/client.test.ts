@@ -72,18 +72,39 @@ describe('createClient', () => {
         });
     });
 
-    it('captures the caller file and line by default', async () => {
+    it('captures the caller file by default', async () => {
         const { client, bodies } = clientWithMock();
 
         client.criticalHigh('Payment error');
         await client.flush();
 
         expect(bodies[0]!.file_name).toContain('client.test.ts');
-        expect(typeof bodies[0]!.line_number).toBe('number');
+    });
+
+    it('does not send a line number unless asked to', async () => {
+        const { client, bodies } = clientWithMock();
+
+        client.criticalHigh('Payment error');
+        await client.flush();
+
+        // The location is captured either way — the file proves it — but the
+        // line is withheld, because outside a plugin build it is a guess.
+        expect(bodies[0]!.file_name).toBeDefined();
+        expect(bodies[0]!.line_number).toBeUndefined();
+    });
+
+    it('sends the line number once lineNumbers is switched on', async () => {
+        const { client, bodies } = clientWithMock({ lineNumbers: true });
+
+        client.criticalHigh('Payment error');
+        await client.flush();
+
+        expect(bodies[0]!.file_name).toContain('client.test.ts');
+        expect(bodies[0]!.line_number).toBeGreaterThan(0);
     });
 
     it('captures the caller even from inside a catch or a callback', async () => {
-        const { client, bodies } = clientWithMock();
+        const { client, bodies } = clientWithMock({ lineNumbers: true });
 
         try {
             throw new Error('boom');
@@ -103,6 +124,42 @@ describe('createClient', () => {
             expect(body.file_name).toContain('client.test.ts');
             expect(body.line_number).toBeGreaterThan(0);
         }
+    });
+
+    it('points a reported error at its throw site, not at the reporting call', async () => {
+        const { client, bodies } = clientWithMock({ lineNumbers: true });
+        const error = new Error('card declined');
+        error.stack = [
+            'Error: card declined',
+            '    at charge (/src/checkout/charge.ts:17:9)',
+            '    at store (/src/checkout/api.ts:42:5)',
+        ].join('\n');
+
+        // Reported from here — a global handler is exactly this shape.
+        client.criticalHigh(error.message, error);
+        await client.flush();
+
+        expect(bodies[0]!.file_name).toBe('/src/checkout/charge.ts');
+        expect(bodies[0]!.line_number).toBe(17);
+    });
+
+    it('falls back to the call site for a description that is not an error', async () => {
+        const { client, bodies } = clientWithMock();
+
+        client.criticalHigh('Payment error', { orderId: 42 });
+        await client.flush();
+
+        expect(bodies[0]!.file_name).toContain('client.test.ts');
+    });
+
+    it('omits the location for a reported error when captureLocation is false', async () => {
+        const { client, bodies } = clientWithMock({ captureLocation: false });
+
+        client.criticalHigh('Payment error', new Error('card declined'));
+        await client.flush();
+
+        expect(bodies[0]!.file_name).toBeUndefined();
+        expect(bodies[0]!.line_number).toBeUndefined();
     });
 
     it('omits the call site when captureLocation is false', async () => {
@@ -125,6 +182,138 @@ describe('createClient', () => {
 
         expect(bodies[0]!.file_name).toBeUndefined();
         expect(bodies[0]!.line_number).toBeUndefined();
+    });
+
+    describe('a location injected by a build plugin', () => {
+        /** Call as the build plugins rewrite it: location appended as the last argument. */
+        const callAsPluginWould = (
+            client: ReturnType<typeof createClient>,
+            ...args: unknown[]
+        ): void => (client.criticalHigh as (...a: unknown[]) => void)(...args);
+
+        const location = { __bugboardLocation: true, file: 'src/checkout/Payment.tsx', line: 42 };
+
+        it('is used instead of the captured stack', async () => {
+            const { client, bodies } = clientWithMock();
+
+            callAsPluginWould(client, 'Payment error', undefined, undefined, location);
+            await client.flush();
+
+            expect(bodies[0]!.file_name).toBe('src/checkout/Payment.tsx');
+        });
+
+        it('still withholds the line unless lineNumbers is on', async () => {
+            // An injected line is exact, but the option governs the field: a
+            // project either gets line numbers on its cards or it does not, and
+            // that must not depend on which modules a plugin happened to reach.
+            const plain = clientWithMock();
+            callAsPluginWould(plain.client, 'Payment error', undefined, undefined, location);
+            await plain.client.flush();
+
+            expect(plain.bodies[0]!.line_number).toBeUndefined();
+
+            const opted = clientWithMock({ lineNumbers: true });
+            callAsPluginWould(opted.client, 'Payment error', undefined, undefined, location);
+            await opted.client.flush();
+
+            expect(opted.bodies[0]!.line_number).toBe(42);
+        });
+
+        it('is stripped from the arguments, leaving description and tags in place', async () => {
+            const { client, bodies } = clientWithMock();
+
+            // The plugin appends after however many arguments the caller wrote,
+            // so `tags` here sits where a third argument normally would.
+            callAsPluginWould(client, 'Payment error', 'card declined', ['payments'], location);
+            await client.flush();
+
+            expect(bodies[0]!.description).toContain('card declined');
+            expect(bodies[0]!.tags).toContain('payments');
+            expect(bodies[0]!.file_name).toBe('src/checkout/Payment.tsx');
+        });
+
+        it('is used even with fewer preceding arguments', async () => {
+            const { client, bodies } = clientWithMock();
+
+            callAsPluginWould(client, 'Payment error', location);
+            await client.flush();
+
+            expect(bodies[0]!.file_name).toBe('src/checkout/Payment.tsx');
+            expect(bodies[0]!.description).toBeUndefined();
+        });
+
+        it('wins even when captureLocation is off', async () => {
+            const { client, bodies } = clientWithMock({ captureLocation: false });
+
+            callAsPluginWould(client, 'Payment error', undefined, undefined, location);
+            await client.flush();
+
+            expect(bodies[0]!.file_name).toBe('src/checkout/Payment.tsx');
+        });
+
+        it('falls back to stack capture when the brand is missing or malformed', async () => {
+            const { client, bodies } = clientWithMock();
+
+            // A stale plugin, or a user passing an object of their own.
+            callAsPluginWould(client, 'Payment error', undefined, undefined, {
+                file: 'spoofed.ts',
+                line: 1,
+            });
+            await client.flush();
+
+            expect(bodies[0]!.file_name).toContain('client.test.ts');
+        });
+
+        it('loses to a reported error, which knows where it was thrown', async () => {
+            // The plugin's answer is exact — but it answers "where was this
+            // reported", and the error answers "where did this fail". In a
+            // global handler the first is the same file every time.
+            const { client, bodies } = clientWithMock({ lineNumbers: true });
+            const error = new Error('card declined');
+            error.stack = 'Error: card declined\n    at charge (/src/charge.ts:17:9)';
+
+            callAsPluginWould(client, 'Payment error', error, undefined, location);
+            await client.flush();
+
+            expect(bodies[0]!.file_name).toBe('/src/charge.ts');
+            expect(bodies[0]!.line_number).toBe(17);
+        });
+
+        it('ignores a branded object with an unusable file or line', async () => {
+            const { client, bodies } = clientWithMock();
+
+            callAsPluginWould(client, 'Payment error', undefined, undefined, {
+                __bugboardLocation: true,
+                file: '',
+                line: 0,
+            });
+            await client.flush();
+
+            expect(bodies[0]!.file_name).toContain('client.test.ts');
+        });
+    });
+
+    it('still delivers a report when the description fights back', async () => {
+        // The backstop catches anything thrown while queueing, which means an
+        // unguarded property read costs the entire card rather than one field.
+        const { client, bodies } = clientWithMock();
+        const hostile = new Error('hostile');
+        for (const property of ['stack', 'message', 'name']) {
+            Object.defineProperty(hostile, property, {
+                get() {
+                    throw new Error('nope');
+                },
+            });
+        }
+
+        client.criticalHigh('Payment error', hostile);
+        await client.flush();
+
+        expect(bodies).toHaveLength(1);
+        expect(bodies[0]!.title).toBe('Payment error');
+        expect(bodies[0]!.description).toBe('[Error]');
+        // The location falls back to the call site, since the stack is unreadable.
+        expect(bodies[0]!.file_name).toContain('client.test.ts');
     });
 
     it('sends nothing when disabled', async () => {

@@ -47,9 +47,15 @@ export interface ReportPayload {
     title: string;
     description?: string;
     tags: string[];
-    /** File of the code that made the reporting call (auto-captured). */
+    /**
+     * File the report points at (auto-captured): the throw site when an error
+     * was reported, the reporting call site otherwise.
+     */
     file_name?: string;
-    /** Line of the code that made the reporting call (auto-captured). */
+    /**
+     * Line within `file_name`. Omitted unless the `lineNumbers` option is
+     * switched on — see its documentation for why.
+     */
     line_number?: number;
 }
 
@@ -78,11 +84,51 @@ export interface BugBoardConfig {
     /** Tags merged into every card. */
     defaultTags?: readonly string[];
     /**
-     * Auto-capture the file and line of each reporting call (sent as
-     * `file_name`/`line_number`). Defaults to `true`; set `false` to skip
-     * reading the call stack.
+     * Auto-capture the source location each report points at (sent as
+     * `file_name`, and as `line_number` if `lineNumbers` is on). Defaults to
+     * `true`; set `false` to skip reading stacks entirely.
+     *
+     * When the description is an error, that is its throw site — read off the
+     * error's own stack, so a report made from a global handler names the
+     * failure rather than the handler. Otherwise it is the reporting call site.
      */
     captureLocation?: boolean;
+    /**
+     * Also report the line number, as `line_number`. Defaults to **`false`**:
+     * the file name ships, the line does not.
+     *
+     * The file name is dependable everywhere. The line is not, and the two
+     * fail differently. A bundled app with no build plugin gives the SDK a
+     * stack full of frames that all name the same chunk — so the file is right
+     * no matter which frame is picked, while the line is inferred from frame
+     * depth and can point at the wrong statement. A helper of your own that
+     * wraps a reporting method has the same effect: the location is the
+     * wrapper's, and the line is the wrapper's line rather than yours.
+     *
+     * Switch this on once the line is actually derived rather than inferred —
+     * that is, when a build plugin (`bugboard/vite` and friends) rewrites your
+     * calls, which makes both fields exact, or on a Node server whose source
+     * maps are being read. Off by default because a line number that is
+     * *almost* right reads as authoritative and sends people to the wrong
+     * place, which is worse than not showing one.
+     */
+    lineNumbers?: boolean;
+    /**
+     * Resolve bundled stack coordinates back to original files and lines using
+     * source maps that already exist — nothing is ever uploaded.
+     *
+     * On **Node** this turns on the runtime's own support, which reads the
+     * `.js.map` files sitting next to your server chunks. Defaults to `true`.
+     * Note that it only affects modules loaded *afterwards*, so for full
+     * coverage import `bugboard/preload` before your app code, or run with
+     * `--enable-source-maps`.
+     *
+     * In the **browser** it makes the SDK fetch a chunk's `.js.map` when a
+     * report is sent. Defaults to `false`, because it only works if you
+     * actually deploy your maps — which publishes your source. Prefer the build
+     * plugin (`bugboard/vite`), which needs no maps at all.
+     */
+    sourceMaps?: boolean;
     /** Probability (0–1) that a report is sent. Sample under load to stay within limits. */
     sampleRate?: number;
     /** Queue cap. Overflow drops the newest report (counted in debug output). */

@@ -25,13 +25,7 @@ const JSON_INDENT = 2;
 function describe(description: unknown): string | undefined {
     if (description === null || description === undefined) return undefined;
 
-    const text = (
-        description instanceof Error
-            ? errorText(description)
-            : typeof description === 'string'
-              ? description
-              : stringify(description)
-    ).trim();
+    const text = descriptionText(description).trim();
 
     if (text === '') return undefined;
     if (text.length <= MAX_DESCRIPTION_LENGTH) return text;
@@ -41,11 +35,43 @@ function describe(description: unknown): string | undefined {
     return text.slice(0, MAX_DESCRIPTION_LENGTH - TRUNCATION_MARKER.length) + TRUNCATION_MARKER;
 }
 
+/**
+ * The description's text, whatever the value does when it is touched.
+ *
+ * Every rung below is individually total, and this wraps them anyway: the
+ * ladder is reached from `buildPayload`, outside every try/catch except the
+ * client's own backstop — and that backstop drops the whole report. A card
+ * naming the class beats no card at all. The PHP SDK's ladder makes the same
+ * guarantee the same way.
+ */
+function descriptionText(description: unknown): string {
+    try {
+        if (description instanceof Error) return errorText(description);
+        if (typeof description === 'string') return description;
+        return stringify(description);
+    } catch {
+        return label(description);
+    }
+}
+
 /** An `Error`'s message + stack, without repeating the message. */
 function errorText(error: Error): string {
-    const stack = error.stack ?? '';
+    let stack: string;
+    let message: string;
+
+    try {
+        stack = typeof error.stack === 'string' ? error.stack : '';
+        message = typeof error.message === 'string' ? error.message : '';
+    } catch {
+        // `stack` and `message` are plain properties on a plain Error and
+        // getters on a Proxy, a framework wrapper, or a test double — and a
+        // getter can throw. Degrade this error alone: nested in a context
+        // object, the surrounding object still serializes.
+        return label(error);
+    }
+
     // V8 stacks begin with "name: message" — avoid repeating the message.
-    return stack.includes(error.message) ? stack : `${error.message}\n${stack}`.trim();
+    return stack.includes(message) ? stack : `${message}\n${stack}`.trim();
 }
 
 function stringify(value: unknown): string {
@@ -97,10 +123,19 @@ function cycleSafeReplacer(): (this: unknown, key: string, value: unknown) => un
     };
 }
 
-/** Last resort: name the thing, rather than a useless `[object Object]`. */
+/**
+ * Last resort: name the thing, rather than a useless `[object Object]`.
+ *
+ * Every other rung falls back to this one, so it cannot be the rung that
+ * throws — and reading `constructor` runs a getter like any other property.
+ */
 function label(value: unknown): string {
-    const name = (value as { constructor?: { name?: string } } | null)?.constructor?.name;
-    return `[${name ?? 'object'}]`;
+    try {
+        const name = (value as { constructor?: { name?: string } } | null)?.constructor?.name;
+        return `[${typeof name === 'string' && name !== '' ? name : 'object'}]`;
+    } catch {
+        return '[object]';
+    }
 }
 
 /** Normalize array-or-CSV tags: trim, drop empties, de-dupe, clamp to 50 chars. */
@@ -119,7 +154,7 @@ export function normalizeTags(tags: TagsInput | undefined): string[] {
  * Build the request body for one report. The severity/priority come from the
  * method name (never from user input), `environment`/`release`/`defaultTags`
  * are folded into the tags, and the auto-captured call site (when available)
- * is attached as `file_name`/`line_number`.
+ * is attached as `file_name` — plus `line_number` if that is switched on.
  */
 export function buildPayload(
     severity: Severity,
@@ -127,7 +162,7 @@ export function buildPayload(
     title: string,
     description: unknown,
     tags: TagsInput | undefined,
-    config: Pick<ResolvedConfig, 'environment' | 'release' | 'defaultTags'>,
+    config: Pick<ResolvedConfig, 'environment' | 'release' | 'defaultTags' | 'lineNumbers'>,
     location?: SourceLocation,
 ): ReportPayload {
     const baseTags: string[] = [...config.defaultTags];
@@ -146,7 +181,9 @@ export function buildPayload(
 
     if (location) {
         payload.file_name = location.file;
-        payload.line_number = location.line;
+        // The line is held back unless asked for: it is the half of the
+        // location that a bundled build without the plugin can only guess at.
+        if (config.lineNumbers) payload.line_number = location.line;
     }
 
     return payload;

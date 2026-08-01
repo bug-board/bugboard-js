@@ -12,6 +12,7 @@ copy the ones you need into your project.
 | [`app/error.tsx`](./app/error.tsx) | Client — recoverable route-segment errors | Publishable |
 | [`app/global-error.tsx`](./app/global-error.tsx) | Client — root layout errors | Publishable |
 | [`instrumentation.ts`](./instrumentation.ts) | Server — catches errors before redaction | Secret |
+| [`next.config.js`](./next.config.js) | Build — gives cards real file names | — |
 
 Two things to install and know:
 
@@ -22,3 +23,22 @@ Two things to install and know:
 
 These files import Next.js/React and use the `@/…` path alias, so they type-check inside a real
 Next.js project, not standalone here.
+
+## Real file names
+
+Without [`next.config.js`](./next.config.js), a production build reports
+`.next/server/chunks/456.js:1` rather than `app/api/checkout/route.ts:42` — Next minifies and
+chunks both halves of your app. The config adds the build plugin, which writes the real location
+in at compile time; no source maps are generated, deployed, or uploaded.
+
+One Next-specific caveat: the reported location becomes exact, but the stack **inside a caught
+error's description** stays minified on the server. Next installs its own
+`Error.prepareStackTrace` to power its error overlay, which replaces the formatter Node applies
+source maps in — so `bugboard/preload`, `NODE_OPTIONS=--enable-source-maps` and
+`experimental.serverSourceMaps` all leave it unchanged. Rely on the reported location here.
+
+Since the plugin makes the line exact as well, this is a setup where adding `lineNumbers: true` to
+your client config is worthwhile — it is off by default because an app without the plugin can only
+guess at the line.
+
+Full reference: [`../../SOURCE_LOCATIONS.md`](../../SOURCE_LOCATIONS.md).

@@ -4,7 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/bugboard.svg)](https://www.npmjs.com/package/bugboard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report bugs as **cards** on your project board — from Node 20+, browsers, and edge runtimes — built on the platform `fetch`. Importing the SDK pulls in **nothing else**: the one bundled dependency is a sealed-box binding that is lazy-loaded only if you turn on payload encryption.
+Official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report bugs as **cards** on your project board — from Node 20+, browsers, and edge runtimes — built on the platform `fetch`. Importing the SDK pulls in **nothing else**: the one bundled dependency is a sealed-box binding that is lazy-loaded only if you turn on payload encryption.
 
 ```ts
 import { createClient } from 'bugboard';
@@ -31,10 +31,10 @@ queue with retries and backoff, and the SDK **never throws into your app**.
 
 ## Contents
 
-- [Installation](#installation)
+- [Installation](#installation) — including [what's enabled by default](#whats-enabled-by-default)
 - [Examples](examples/) — runnable, one file per usage mode
 - [Setup](#setup) — [browser](#browser--client-side-publishable-key) · [server](#server--node-secret-key) · [env var names](#framework-environment-variables)
-- [Usage](#usage) — [the 16 methods](#the-16-reporting-methods) · [serverless flushing](#serverless--short-lived-scripts)
+- [Usage](#usage) — [the 16 methods](#the-16-reporting-methods) · [serverless flushing](#serverless--short-lived-scripts) · [real file names in bundled apps](#bundled-apps-getting-real-file-names)
 - [Configuration](#configuration)
 - [Encrypting sensitive reports](#encrypting-sensitive-reports)
 - [Delivery semantics](#delivery-semantics) — retries, dedup, quotas
@@ -52,6 +52,40 @@ There is nothing framework-specific to install. The SDK is a single framework-ag
 uses only platform APIs (`fetch`, WebCrypto), so the same package runs unchanged on Node 20+, in any
 browser or bundler (Vite, webpack, Next.js, Nuxt…), and on edge runtimes (Cloudflare Workers, Vercel
 Edge, Deno). It ships ESM + CJS builds with full TypeScript types.
+
+The same package also provides the optional build-time entry points `bugboard/vite`,
+`bugboard/rollup`, `bugboard/webpack` and `bugboard/esbuild`, plus the startup entry
+`bugboard/preload` — see [bundled apps](#bundled-apps-getting-real-file-names).
+
+### What's enabled by default
+
+Installing the SDK turns on three things without any configuration. All are local: nothing is
+uploaded, and no source files are read.
+
+| Default               | What it does                                                                                                                                                                                                    | Turn off with            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| **Error throw sites** | Reads a reported error's own stack, so a card names where it was thrown rather than where you reported it — which is what makes a single global handler useful.                                                 | `captureLocation: false` |
+| **Call-site capture** | Reads the call stack when you report anything else, to record the **file** on the card.                                                                                                                         | `captureLocation: false` |
+| **Node source maps**  | Switches on Node's own source-map support, so a bundled server's stacks name your files instead of chunks. Changes global `error.stack` rendering for the process — the same thing `--enable-source-maps` does. | `sourceMaps: false`      |
+
+Cards carry the **file name, not the line number**. The file is dependable everywhere; the line is
+only exact once a build plugin writes it in, and elsewhere it is inferred from the call stack and
+can point at the wrong statement. A line number that is almost right is worse than none, so it is
+opt-in — turn it on with `lineNumbers: true` once you have the plugin installed. See
+[line numbers](SOURCE_LOCATIONS.md#line-numbers).
+
+Three things are **not** automatic and need setup if you want them:
+
+- **The build plugin.** Installing `bugboard` does not change your build. If your app is bundled
+  and you want real file names in the browser, add the plugin to your bundler config — see
+  [bundled apps](#bundled-apps-getting-real-file-names). This is the most common reason cards
+  still say `index-a3f2b1.js`.
+- **Line numbers** (`lineNumbers: true`), as above.
+- **Browser source-map fetching** (`sourceMaps: true`), which is off because it requires deploying
+  your `.js.map` files and so publishing your source.
+
+Everything about all six, including how to switch each one off, is in
+**[SOURCE_LOCATIONS.md](SOURCE_LOCATIONS.md)**.
 
 ## Setup
 
@@ -144,6 +178,36 @@ functions, CLI scripts — flush before returning:
 await bugboard.flush();
 ```
 
+### Bundled apps: getting real file names
+
+Every card records the file that reported it. Once a bundler minifies and chunks your code,
+though, the call stack the SDK reads only names a chunk — `assets/index-a3f2b1.js`.
+
+Add the build plugin and the real location is written in at compile time. No source maps are
+generated, deployed, or uploaded:
+
+```ts
+// vite.config.ts
+import bugboard from 'bugboard/vite';
+
+export default { plugins: [bugboard()] };
+```
+
+`bugboard/webpack` is the webpack loader equivalent, `bugboard/esbuild` covers esbuild (and so
+Lambda bundles, Wrangler and SST), and `bugboard/rollup` is the same plugin as `bugboard/vite`.
+Vue and Svelte single-file components are handled, as are JSX and TSX.
+
+For a bundled **Node** server, `import 'bugboard/preload'` as the very first import instead: it
+switches on Node's own source-map support, which reads the `.js.map` files already sitting next to
+your chunks.
+
+With the plugin in place the line number is exact too, so this is the point at which it is worth
+adding `lineNumbers: true` to your config — it is off by default because without the plugin the
+line is a guess.
+
+Full detail — how each part works, every option, and how to turn any of it off — in
+**[SOURCE_LOCATIONS.md](SOURCE_LOCATIONS.md)**.
+
 ## Configuration
 
 ```ts
@@ -179,7 +243,9 @@ const bugboard = createClient({
 | `beforeSend`          | `function` | —       | Scrub PII or veto a report — return the payload, or `null` to drop it.            |
 | `debug`               | `boolean`  | `false` | Verbose internal logging (keys always redacted).                                  |
 | `logLocally`          | `boolean`  | `false` | Log each report locally instead of sending it (dry run).                          |
-| `captureLocation`     | `boolean`  | `true`  | Auto-capture the caller's file/line as `file_name`/`line_number`.                 |
+| `captureLocation`     | `boolean`  | `true`  | Auto-capture a source location — an error's throw site, else the call site.       |
+| `lineNumbers`         | `boolean`  | `false` | Also send `line_number`. Off by default — exact only with the build plugin.       |
+| `sourceMaps`          | `boolean`  | Node    | Node: read maps already on disk (`true`). Browser: fetch them at report time.     |
 | `hideApiResponse`     | `boolean`  | `true`  | Ask the server to omit the card from its response (not echoed back).              |
 
 Provide **either** `apiKey` **or** `keyId` + `signingSecret` — the SDK picks bearer or HMAC auth

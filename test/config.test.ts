@@ -98,4 +98,59 @@ describe('resolveConfig', () => {
     it('honors enabled: false', () => {
         expect(resolveConfig({ apiKey: 'k', enabled: false }).resolved.enabled).toBe(false);
     });
+
+    describe('sourceMaps', () => {
+        // The two halves resolve separately on purpose. Node's support reads
+        // maps already on disk, so it is free; the browser's fetches them over
+        // the network, so it must never be switched on by inference. An edge
+        // runtime with Node compatibility enabled looks like Node while having
+        // no maps on disk, and would otherwise make pointless requests.
+        it('enables Node support by default, without enabling network fetching', () => {
+            const { resolved } = resolveConfig({ apiKey: 'k' });
+
+            expect(resolved.nodeSourceMaps).toBe(true);
+            expect(resolved.browserSourceMaps).toBe(false);
+        });
+
+        it('turns both off when explicitly disabled', () => {
+            const { resolved } = resolveConfig({ apiKey: 'k', sourceMaps: false });
+
+            expect(resolved.nodeSourceMaps).toBe(false);
+            expect(resolved.browserSourceMaps).toBe(false);
+        });
+
+        it('turns network fetching on only when explicitly asked', () => {
+            const { resolved } = resolveConfig({ apiKey: 'k', sourceMaps: true });
+
+            expect(resolved.nodeSourceMaps).toBe(true);
+            expect(resolved.browserSourceMaps).toBe(true);
+        });
+    });
+
+    describe('lineNumbers', () => {
+        it('is off by default, while location capture stays on', () => {
+            const { resolved } = resolveConfig({ apiKey: 'k' });
+
+            expect(resolved.lineNumbers).toBe(false);
+            expect(resolved.captureLocation).toBe(true);
+        });
+
+        it('is on only when explicitly asked for', () => {
+            expect(resolveConfig({ apiKey: 'k', lineNumbers: true }).resolved.lineNumbers).toBe(
+                true,
+            );
+            expect(resolveConfig({ apiKey: 'k', lineNumbers: false }).resolved.lineNumbers).toBe(
+                false,
+            );
+        });
+
+        it('is not implied by turning source maps on', () => {
+            // Maps make the line exact where they resolve, but they resolve
+            // per-module, so inferring the option from them would make the
+            // field appear on some cards and not others.
+            const { resolved } = resolveConfig({ apiKey: 'k', sourceMaps: true });
+
+            expect(resolved.lineNumbers).toBe(false);
+        });
+    });
 });

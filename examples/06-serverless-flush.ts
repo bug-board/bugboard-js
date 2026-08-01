@@ -80,6 +80,21 @@ export const workerHandler = {
 // ─── Deno Deploy ──────────────────────────────────────────────────────────────
 // No `waitUntil` equivalent — plain `await bugboard.flush()` before returning.
 
+// ─── Getting real file names out of a serverless bundle ───────────────────────
+// Everything here ships as a bundle, so the call stack only names the bundle —
+// `dist/handler.mjs:1` instead of `src/checkout.ts:42`. Serverless bundles also
+// usually ship without source maps, so there is nothing to fall back on.
+//
+// Add the esbuild plugin to the build (Lambda, Wrangler and SST all run esbuild
+// underneath) and the real location is written in at compile time:
+//
+//   import bugboard from 'bugboard/esbuild';
+//   await esbuild.build({ …, plugins: [bugboard()] });
+//
+// Wrangler accepts no plugins, so for Cloudflare Workers bundle first and point
+// `main` in wrangler.toml at the output. See ./13-source-locations/ and
+// ../SOURCE_LOCATIONS.md.
+
 // ─── Stubs / minimal types so this file stands alone ──────────────────────────
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
