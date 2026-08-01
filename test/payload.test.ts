@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { buildPayload, normalizeTags } from '../src/payload';
 
-const noContext = { environment: undefined, release: undefined, defaultTags: [] };
+const noContext = {
+    environment: undefined,
+    release: undefined,
+    defaultTags: [],
+    lineNumbers: false,
+};
 
 describe('normalizeTags', () => {
     it('accepts an array', () => {
@@ -147,6 +152,65 @@ describe('buildPayload', () => {
         expect(description).toContain('"ctx": "checkout"');
     });
 
+    it('survives an error whose stack is a throwing getter', () => {
+        // A Proxy, a framework wrapper, or a test double can make `stack` and
+        // `message` getters, and a getter can throw. This is reached outside
+        // every try/catch but the client's backstop, which drops the whole
+        // report — so degrading to a label is the difference between a card
+        // and no card.
+        const hostile = new Error('hostile');
+        Object.defineProperty(hostile, 'stack', {
+            get() {
+                throw new Error('nope');
+            },
+        });
+
+        const { description } = buildPayload('major', 'medium', 'T', hostile, undefined, noContext);
+
+        expect(description).toBe('[Error]');
+    });
+
+    it('degrades only the hostile error nested in a context object', () => {
+        const hostile = new Error('hostile');
+        Object.defineProperty(hostile, 'message', {
+            get() {
+                throw new Error('nope');
+            },
+        });
+
+        const { description } = buildPayload(
+            'minor',
+            'low',
+            'T',
+            { ctx: 'checkout', err: hostile, orderId: 42 },
+            undefined,
+            noContext,
+        );
+
+        // The rest of the object survives, exactly as a cycle does.
+        expect(description).toContain('"ctx": "checkout"');
+        expect(description).toContain('"orderId": 42');
+        expect(description).toContain('[Error]');
+    });
+
+    it('survives an object whose constructor is a throwing getter', () => {
+        // `label` is what every other rung falls back to, so it cannot throw.
+        const hostile = {
+            toJSON(): never {
+                throw new Error('nope');
+            },
+        };
+        Object.defineProperty(hostile, 'constructor', {
+            get() {
+                throw new Error('nope');
+            },
+        });
+
+        const { description } = buildPayload('minor', 'low', 'T', hostile, undefined, noContext);
+
+        expect(description).toBe('[object]');
+    });
+
     it('survives bigints, functions, Maps, and Sets', () => {
         const { description } = buildPayload(
             'minor',
@@ -191,6 +255,7 @@ describe('buildPayload', () => {
 
     it('folds environment, release, and defaultTags into the tags', () => {
         const payload = buildPayload('moderate', 'medium', 'Title', undefined, ['ui'], {
+            ...noContext,
             environment: 'production',
             release: '1.4.2',
             defaultTags: ['web'],
@@ -208,18 +273,44 @@ describe('buildPayload', () => {
         expect(payload.tags).toEqual(['web', 'ui']);
     });
 
-    it('attaches file_name and line_number when a location is given', () => {
+    it('attaches file_name when a location is given', () => {
         const payload = buildPayload('minor', 'low', 'Title', undefined, undefined, noContext, {
             file: 'src/pages/Checkout.tsx',
             line: 42,
         });
 
         expect(payload.file_name).toBe('src/pages/Checkout.tsx');
+    });
+
+    it('withholds line_number by default, even with a location in hand', () => {
+        const payload = buildPayload('minor', 'low', 'Title', undefined, undefined, noContext, {
+            file: 'src/pages/Checkout.tsx',
+            line: 42,
+        });
+
+        expect(payload.line_number).toBeUndefined();
+    });
+
+    it('attaches line_number once lineNumbers is switched on', () => {
+        const payload = buildPayload(
+            'minor',
+            'low',
+            'Title',
+            undefined,
+            undefined,
+            { ...noContext, lineNumbers: true },
+            { file: 'src/pages/Checkout.tsx', line: 42 },
+        );
+
+        expect(payload.file_name).toBe('src/pages/Checkout.tsx');
         expect(payload.line_number).toBe(42);
     });
 
     it('omits file_name and line_number when no location is given', () => {
-        const payload = buildPayload('minor', 'low', 'Title', undefined, undefined, noContext);
+        const payload = buildPayload('minor', 'low', 'Title', undefined, undefined, {
+            ...noContext,
+            lineNumbers: true,
+        });
 
         expect(payload.file_name).toBeUndefined();
         expect(payload.line_number).toBeUndefined();

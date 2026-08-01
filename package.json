@@ -35,20 +35,52 @@
   "license": "MIT",
   "author": "BugBoard (https://bugboard.dev)",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/preload.js",
+    "./dist/preload.cjs"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./preload": {
+      "types": "./dist/preload.d.ts",
+      "import": "./dist/preload.js",
+      "require": "./dist/preload.cjs"
+    },
+    "./vite": {
+      "types": "./dist/plugin/vite.d.ts",
+      "import": "./dist/plugin/vite.js",
+      "require": "./dist/plugin/vite.cjs"
+    },
+    "./rollup": {
+      "types": "./dist/plugin/vite.d.ts",
+      "import": "./dist/plugin/vite.js",
+      "require": "./dist/plugin/vite.cjs"
+    },
+    "./webpack": {
+      "types": "./dist/plugin/webpack.d.ts",
+      "import": "./dist/plugin/webpack.js",
+      "require": "./dist/plugin/webpack.cjs"
+    },
+    "./esbuild": {
+      "types": "./dist/plugin/esbuild.d.ts",
+      "import": "./dist/plugin/esbuild.js",
+      "require": "./dist/plugin/esbuild.cjs"
+    },
     "./package.json": "./package.json"
+  },
+  "browser": {
+    "node:crypto": false
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "SOURCE_LOCATIONS.md"
   ],
   "scripts": {
     "build": "tsup",

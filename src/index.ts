@@ -17,6 +17,8 @@ export {
     BugBoardServerError,
     BugBoardValidationError,
 } from './errors';
+export { enableNodeSourceMaps as enableSourceMaps } from './sourcemaps-node';
+export type { SourceMapStatus } from './sourcemaps-node';
 export type {
     BugBoardClient,
     BugBoardConfig,

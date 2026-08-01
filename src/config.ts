@@ -16,6 +16,12 @@ export interface ResolvedConfig {
     encryptionKeyId?: string;
     enabled: boolean;
     captureLocation: boolean;
+    /** Send `line_number` alongside `file_name` (opt-in only). */
+    lineNumbers: boolean;
+    /** Switch on the runtime's own source-map support (Node only; free). */
+    nodeSourceMaps: boolean;
+    /** Fetch a chunk's `.map` over the network when reporting (opt-in only). */
+    browserSourceMaps: boolean;
     environment?: string;
     release?: string;
     defaultTags: readonly string[];
@@ -124,6 +130,19 @@ export function resolveConfig(config: BugBoardConfig): {
             encryptionKeyId: config.encryptionKeyId || undefined,
             enabled,
             captureLocation: config.captureLocation ?? true,
+            // The file name is reported whenever a location is known; the line
+            // is not, because without a build plugin it is inferred from frame
+            // depth rather than derived, and a near-miss line number is read as
+            // authoritative. Opt in once your build makes it exact.
+            lineNumbers: config.lineNumbers === true,
+            // Node reads maps already on disk: free, private, and worth having
+            // unless explicitly refused.
+            nodeSourceMaps: config.sourceMaps !== false,
+            // Fetching maps over the network is never implied. Runtime
+            // detection cannot decide this — an edge runtime with Node
+            // compatibility enabled looks like Node while having no maps on
+            // disk, and it would be left making pointless requests.
+            browserSourceMaps: config.sourceMaps === true,
             environment: config.environment || undefined,
             release: config.release || undefined,
             defaultTags: config.defaultTags ?? [],
