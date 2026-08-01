@@ -15,6 +15,7 @@ lifecycle, and the gotchas specific to each one.
 - [Credentials: which key goes where](#credentials-which-key-goes-where)
 - [The shared client module](#the-shared-client-module)
 - [Delivery and flushing](#delivery-and-flushing) — the one thing that differs by runtime
+- [Source locations in bundled apps](#source-locations-in-bundled-apps) — read this if your cards say `index-a3f2b1.js`
 - [Framework guides](#framework-guides)
   - [Node: Express, Fastify, Koa](#node-express-fastify-koa)
   - [NestJS](#nestjs)
@@ -155,15 +156,25 @@ npm install bugboard
 
 Requires **Node 20+** for server use; any modern browser or edge runtime otherwise.
 
-There is nothing framework-specific to install and no framework-specific entry point. The SDK is one
-framework-agnostic client built on platform APIs (`fetch`, WebCrypto), so the same package runs
-unchanged in Node, browsers, bundlers, and edge runtimes. It ships ESM + CJS builds with full
-TypeScript types.
+There is nothing framework-specific to install. The SDK is one framework-agnostic client built on
+platform APIs (`fetch`, WebCrypto), so the same package runs unchanged in Node, browsers, bundlers,
+and edge runtimes. It ships ESM + CJS builds with full TypeScript types.
+
+Everything is reached through the one import, `bugboard`, except three build-time or startup-time
+entry points that deliberately sit outside it — see
+[Source locations in bundled apps](#source-locations-in-bundled-apps):
+
+| Entry point                        | Runs            | Purpose                                           |
+| ---------------------------------- | --------------- | ------------------------------------------------- |
+| `bugboard/vite`, `bugboard/rollup` | in your bundler | Rewrites call sites with their real file and line |
+| `bugboard/webpack`                 | in your bundler | The same, as a webpack loader                     |
+| `bugboard/preload`                 | before your app | Turns on Node's source-map support                |
 
 The only dependency is `tweetnacl-sealedbox-js`, and it is dynamically imported the first time an
 encryption key is used — so if you don't enable [payload encryption](#payload-encryption), importing
-`bugboard` pulls in nothing. The package is marked `sideEffects: false`, so bundlers tree-shake what
-you don't call.
+`bugboard` pulls in nothing. Only `bugboard/preload` has side effects; everything else is marked
+side-effect free, so bundlers tree-shake what you don't call. Browser source-map support is a
+separate chunk that is only downloaded if you turn it on.
 
 ---
 
@@ -340,6 +351,210 @@ you don't need to track whether you reported anything.
 Cloudflare Workers and Vercel Edge offer `ctx.waitUntil()`, which is better still: it lets the
 response go out immediately while the runtime keeps the invocation alive for the flush. See the
 [serverless section](#serverless-lambda-vercel-cloudflare-workers-deno).
+
+---
+
+## Source locations in bundled apps
+
+> This section is the practical summary. **[SOURCE_LOCATIONS.md](../SOURCE_LOCATIONS.md)** is the
+> complete reference: every mechanism, every option, what is on by default, how to turn each part
+> off, and the tested-environment matrix.
+
+Every card carries `file_name` for the code it is about, and `line_number` too if you switch that
+on. When you report an error, that is **where the error was thrown**, read off its own stack — so a
+single global handler produces cards that point all over your app rather than all at the handler.
+Otherwise the SDK reads its own call stack to find where you called from.
+
+Either way it is a stack, which is exact until a bundler gets involved and useless afterwards. In a
+production build your `src/checkout/Payment.tsx:42` has been minified into
+`assets/index-a3f2b1.js:1`, and once several modules land in one chunk the SDK often can't identify
+the caller at all.
+
+Because those two fields degrade differently under bundling — the file stays right while the line
+becomes a guess — **`line_number` is off by default**. Add `lineNumbers: true` once the build
+plugin below is in place and it is exact again; the reasoning is in
+[SOURCE_LOCATIONS.md](../SOURCE_LOCATIONS.md#line-numbers).
+
+The information needed to undo that is a source map. **You do not have to upload one.** There
+are three ways to get real locations back, and you should reach for them in this order.
+
+### 1. The build plugin — exact, no maps at all (recommended)
+
+Your bundler knows the original file and line while it is transforming your module, before
+chunking or minification happens. The plugin writes that into the call as a plain string, so it
+survives the build the same way any other string literal does. No maps are generated, deployed,
+or uploaded, and there is no runtime cost.
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import bugboard from 'bugboard/vite';
+
+export default defineConfig({
+  plugins: [bugboard()],
+});
+```
+
+```js
+// webpack.config.js
+module.exports = {
+  module: {
+    rules: [
+      {
+        test: /\.[cm]?[jt]sx?$/,
+        exclude: /node_modules/,
+        enforce: 'pre', // must run before Babel/SWC, while lines are original
+        use: 'bugboard/webpack',
+      },
+    ],
+  },
+};
+```
+
+```js
+// next.config.js — Turbopack, the default in Next 16
+module.exports = {
+  turbopack: {
+    rules: {
+      '*.ts': { loaders: ['bugboard/webpack'] },
+      '*.tsx': { loaders: ['bugboard/webpack'] },
+    },
+  },
+};
+```
+
+Turbopack rules take no `as` field here — it gets appended to the filename, so `as: '*.tsx'`
+makes the build look for `page.tsx.tsx`. On Next 16, a `webpack` key with no `turbopack` key is a
+hard build error; use the Turbopack form above or pass `next build --webpack`.
+
+```js
+// esbuild — and anything built on it: Lambda bundles, Wrangler, SST
+import * as esbuild from 'esbuild';
+import bugboard from 'bugboard/esbuild';
+
+await esbuild.build({
+  entryPoints: ['src/index.ts'],
+  bundle: true,
+  plugins: [bugboard()],
+});
+```
+
+`bugboard/rollup` is the same plugin as `bugboard/vite`. Rspack works through the webpack entry.
+
+**Nuxt needs it twice.** Nitro builds your `server/` directory with its own Rollup pipeline, which
+never sees `vite.plugins`, so server routes are missed unless you add it there too:
+
+```ts
+// nuxt.config.ts
+import bugboard from 'bugboard/vite';
+
+export default defineNuxtConfig({
+  vite: { plugins: [bugboard()] },
+  nitro: { rollupConfig: { plugins: [bugboard()] } },
+});
+```
+
+**Cloudflare Workers**: Wrangler runs esbuild but takes no plugins, so bundle first with
+`bugboard/esbuild` and point `main` in `wrangler.toml` at the output.
+
+The plugin only rewrites calls it can prove are yours: a client built by `createClient()` in the
+same module, or one imported from a module whose path mentions `bugboard` (the usual
+`lib/bugboard.ts` wrapper). If your client lives somewhere less obvious, name it:
+
+```ts
+bugboard({ clientModules: ['@/lib/telemetry'] });
+```
+
+| Option          | Type       | Default             | Purpose                                                         |
+| --------------- | ---------- | ------------------- | --------------------------------------------------------------- |
+| `clientModules` | `string[]` | `[]`                | Extra modules that export a configured client.                  |
+| `root`          | `string`   | the bundler's root  | Paths are reported relative to this.                            |
+| `include`       | `RegExp`   | `/\.[cm]?[jt]sx?$/` | Files to rewrite.                                               |
+| `exclude`       | `RegExp`   | `/node_modules/`    | Files to skip.                                                  |
+| `loose`         | `boolean`  | `false`             | Rewrite any matching method call without checking the receiver. |
+| `debug`         | `boolean`  | `false`             | Log every file considered and what happened to it.              |
+
+JSX and TSX are fully supported, including calls inside expression containers such as
+`onClick={() => bugboard.critical('…')}`.
+
+Vue and Svelte single-file components are supported too: the plugin rewrites their `<script>`
+blocks in the raw `.vue`/`.svelte` file, before the framework compiler runs, which is the only
+point at which those files still have the line numbers you wrote. Calls placed directly in
+_markup_ — a Vue `@click="() => bugboard.minor('…')"` — are not rewritten, because by the time
+that expression is JavaScript its line numbers belong to the compiler's output rather than to
+your file. Move the handler into `<script>` to get an exact location; left in markup, it falls
+back to runtime capture.
+
+If cards still name a chunk, turn on `debug` — it prints every file the plugin considered and
+whether it rewrote anything, which distinguishes "never saw your module" from "saw it but didn't
+recognise the client":
+
+```ts
+bugboard({ debug: true });
+```
+
+### 2. Node servers — switch on Node's own source-map support
+
+Your server's `.js.map` files are already sitting on disk next to the chunks. Node can read them
+itself; nothing is served publicly and nothing leaves the machine. The SDK turns this on when you
+call `createClient()`, but Node only maps modules loaded **after** support is enabled — so by
+then most of your app is already compiled and stuck with chunk coordinates.
+
+To cover the whole process, load the preload entry before anything else:
+
+```ts
+// instrumentation.ts (Next.js), or the first line of your server entry
+import 'bugboard/preload';
+```
+
+```sh
+node --import bugboard/preload ./server.js
+# or, equivalently, without touching your code:
+NODE_OPTIONS='--enable-source-maps' node ./server.js
+```
+
+This only helps if your build actually emits server source maps:
+
+| Build          | Setting                           |
+| -------------- | --------------------------------- |
+| Nuxt / Nitro   | `sourcemap: { server: true }`     |
+| tsup / esbuild | `sourcemap: true` / `--sourcemap` |
+| tsc            | `"sourceMap": true`               |
+| Vite SSR       | `build: { sourcemap: true }`      |
+
+**Next.js is an exception — this step does nothing there.** Next installs its own
+`Error.prepareStackTrace` (`next/dist/server/patch-error-inspect.js`) to power its error overlay,
+replacing the formatter that Node applies source maps in. Enabling them therefore leaves
+`error.stack` unchanged on the Next server, whether via `bugboard/preload`,
+`NODE_OPTIONS=--enable-source-maps`, or `experimental.serverSourceMaps`. Use the build plugin and
+rely on the reported location instead.
+
+Set `sourceMaps: false` in your client config to opt out entirely.
+
+### 3. Browsers — fetch the map at report time (opt-in)
+
+If you deploy your `.js.map` files, the SDK can fetch a chunk's map when a report is sent and
+resolve the frame from it:
+
+```ts
+createClient({ apiKey: '…', sourceMaps: true });
+```
+
+Off by default, for two honest reasons. Deploying maps publishes your source to anyone who asks
+for it. And resolution needs a network round trip, so a report sent before the map arrives goes
+out with its bundled coordinates — the report is never delayed or lost, it just may not be
+improved in time. The first report from a given chunk pays the fetch; the rest reuse it.
+
+The build plugin is better than this in every respect. Use this only for code the plugin can't
+reach.
+
+### What none of this fixes
+
+The `description` of a caught error contains that error's own stack, as a string. In the browser
+that stack is minified, and only option 3 can improve it — the plugin rewrites reporting calls, and
+a throw is not one. (The card's `file_name` is a different matter: it comes from that same stack, so
+it names the throw site — just in chunk coordinates until a map resolves it.) On Node, option 2
+fixes both, because Node rewrites `error.stack` itself.
 
 ---
 
@@ -873,6 +1088,12 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 ```
 
+Pass the error itself as the description, as above, and each card points at **where that error was
+thrown** rather than at `main.ts` — see
+[source locations](../SOURCE_LOCATIONS.md#errors-report-their-own-throw-site). Without it, every
+report from a handler carries the same `file_name`, which also merges unrelated failures into one
+card.
+
 Browsers report cross-origin script errors as the opaque string `"Script error."` with no stack. To
 get real messages from a CDN-hosted bundle, serve it with `Access-Control-Allow-Origin` and add
 `crossorigin` to the `<script>` tag. Otherwise expect a pile of useless `Script error.` cards — and
@@ -1044,29 +1265,31 @@ for await (const job of queue) {
 
 ## Configuration reference
 
-| Option                | Type       | Default                | Purpose                                                                      |
-| --------------------- | ---------- | ---------------------- | ---------------------------------------------------------------------------- |
-| `apiKey`              | `string`   | —                      | Publishable key (`bb_pub_…`), bearer auth. Browser / client-side.            |
-| `keyId`               | `string`   | —                      | Public key id (`bbk_…`) for HMAC auth. Servers.                              |
-| `signingSecret`       | `string`   | —                      | Signing secret (`bb_sec_…`). Never transmitted.                              |
-| `encryptionPublicKey` | `string`   | —                      | Base64 X25519 public key. When set, every payload is sealed in transit.      |
-| `encryptionKeyId`     | `string`   | —                      | `bbek_…` id echoed in the envelope (enables key rotation).                   |
-| `enabled`             | `boolean`  | `true`                 | Master switch. Forced to `false` when no credentials are set.                |
-| `environment`         | `string`   | —                      | Added to every card as tag `env:<value>`.                                    |
-| `release`             | `string`   | —                      | Added to every card as tag `release:<value>`.                                |
-| `defaultTags`         | `string[]` | `[]`                   | Merged into every card's tags.                                               |
-| `captureLocation`     | `boolean`  | `true`                 | Auto-capture the caller's file/line as `file_name`/`line_number`.            |
-| `sampleRate`          | `number`   | `1.0`                  | Probability (0–1) a report is sent. Clamped into range.                      |
-| `maxQueueSize`        | `number`   | `100`                  | Queue cap; overflow drops the **newest** report.                             |
-| `concurrency`         | `number`   | `3`                    | Parallel in-flight requests when draining.                                   |
-| `flushIntervalMs`     | `number`   | `2000`                 | Background drain cadence.                                                    |
-| `timeoutMs`           | `number`   | `5000`                 | Per-request timeout.                                                         |
-| `maxRetries`          | `number`   | `3`                    | Retries for 429/5xx/network errors (backoff + jitter, honors `Retry-After`). |
-| `beforeSend`          | `function` | —                      | Scrub or veto: return the payload, or `null` to drop it.                     |
-| `debug`               | `boolean`  | `false`                | Verbose internal logging (keys always redacted).                             |
-| `logLocally`          | `boolean`  | `false`                | Log each report instead of sending it (dry run).                             |
-| `hideApiResponse`     | `boolean`  | `true`                 | Ask the server to omit the created card from its response.                   |
-| `baseUrl`             | `string`   | `https://bugboard.dev` | Ingestion origin override. **Internal — for SDK tests.**                     |
+| Option                | Type       | Default                | Purpose                                                                                                 |
+| --------------------- | ---------- | ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| `apiKey`              | `string`   | —                      | Publishable key (`bb_pub_…`), bearer auth. Browser / client-side.                                       |
+| `keyId`               | `string`   | —                      | Public key id (`bbk_…`) for HMAC auth. Servers.                                                         |
+| `signingSecret`       | `string`   | —                      | Signing secret (`bb_sec_…`). Never transmitted.                                                         |
+| `encryptionPublicKey` | `string`   | —                      | Base64 X25519 public key. When set, every payload is sealed in transit.                                 |
+| `encryptionKeyId`     | `string`   | —                      | `bbek_…` id echoed in the envelope (enables key rotation).                                              |
+| `enabled`             | `boolean`  | `true`                 | Master switch. Forced to `false` when no credentials are set.                                           |
+| `environment`         | `string`   | —                      | Added to every card as tag `env:<value>`.                                                               |
+| `release`             | `string`   | —                      | Added to every card as tag `release:<value>`.                                                           |
+| `defaultTags`         | `string[]` | `[]`                   | Merged into every card's tags.                                                                          |
+| `captureLocation`     | `boolean`  | `true`                 | Auto-capture a source location — a reported error's throw site, else the call site.                     |
+| `lineNumbers`         | `boolean`  | `false`                | Also send `line_number`. Off by default — only exact with the build plugin.                             |
+| `sourceMaps`          | `boolean`  | `true` on Node         | Resolve bundled locations via existing maps. See [source locations](#source-locations-in-bundled-apps). |
+| `sampleRate`          | `number`   | `1.0`                  | Probability (0–1) a report is sent. Clamped into range.                                                 |
+| `maxQueueSize`        | `number`   | `100`                  | Queue cap; overflow drops the **newest** report.                                                        |
+| `concurrency`         | `number`   | `3`                    | Parallel in-flight requests when draining.                                                              |
+| `flushIntervalMs`     | `number`   | `2000`                 | Background drain cadence.                                                                               |
+| `timeoutMs`           | `number`   | `5000`                 | Per-request timeout.                                                                                    |
+| `maxRetries`          | `number`   | `3`                    | Retries for 429/5xx/network errors (backoff + jitter, honors `Retry-After`).                            |
+| `beforeSend`          | `function` | —                      | Scrub or veto: return the payload, or `null` to drop it.                                                |
+| `debug`               | `boolean`  | `false`                | Verbose internal logging (keys always redacted).                                                        |
+| `logLocally`          | `boolean`  | `false`                | Log each report instead of sending it (dry run).                                                        |
+| `hideApiResponse`     | `boolean`  | `true`                 | Ask the server to omit the created card from its response.                                              |
+| `baseUrl`             | `string`   | `https://bugboard.dev` | Ingestion origin override. **Internal — for SDK tests.**                                                |
 
 ### Tuning by runtime
 
@@ -1131,8 +1354,9 @@ createClient({
 });
 ```
 
-The payload shape is `ReportPayload` ([`types.ts:43-53`](../src/types.ts#L43-L53)) — `severity`,
-`priority`, `title`, `tags`, plus optional `description`, `file_name`, `line_number`. Note that
+The payload shape is `ReportPayload` ([`types.ts:44-57`](../src/types.ts#L44-L57)) — `severity`,
+`priority`, `title`, `tags`, plus optional `description`, `file_name`, and `line_number` (present
+only when `lineNumbers` is on). Note that
 `payload.description` is always a `string` (or absent) by the time the hook sees it: whatever you
 passed to the reporting call has already been serialized, so a scrubber can treat it as text.
 
@@ -1338,11 +1562,43 @@ by `timeoutMs` × `maxRetries`. If a shutdown is hanging for more than a few sec
 They're batched — up to `flushIntervalMs` (default 2 s) plus request time, by design. If you need
 one immediately, `await bugboard.flush()`.
 
+### Cards say `assets/index-a3f2b1.js` instead of my source file
+
+Your build minified and chunked the code, so the call stack the SDK reads names a chunk. Install the
+build plugin — it writes the real file and line in at compile time, needs no source maps, and works
+in production. On a Node server, `import 'bugboard/preload'` instead. Full explanation in
+[Source locations in bundled apps](#source-locations-in-bundled-apps).
+
+### Cards have no `file_name` at all
+
+Same cause, one step further along: when the SDK and your code end up in the same chunk, the SDK
+can't always pick the caller's frame out of its own. Recent versions fall back to the chunk path
+rather than giving up, but the fix is the same — install the build plugin.
+
+### The plugin isn't rewriting my calls
+
+Turn on `debug` first — `bugboard({ debug: true })` prints a line per file, which tells you whether
+the plugin saw your module at all.
+
+If it never saw it, check `include`/`exclude` and that the plugin is actually in your `plugins`
+array. If it saw it but rewrote nothing, it didn't recognize the client: the plugin only rewrites
+calls it can prove are yours. Name your client's module explicitly with
+`clientModules: ['@/lib/whatever']` if its path doesn't mention `bugboard`.
+
+If your calls go through a helper of your own (`report(err)` wrapping `bugboard.critical(err)`),
+the plugin sees only the helper — put the helper in a module the plugin knows about, or accept the
+helper's location. `loose: true` widens matching to any receiver, at the risk of rewriting an
+unrelated call.
+
+If you upgraded the SDK and the behavior didn't change, make sure your bundler isn't holding a
+cached copy of the old plugin (`rm -rf node_modules/.vite`).
+
 ### Bundle size grew more than expected
 
 Check that you aren't importing the encryption path unintentionally. `tweetnacl-sealedbox-js` is
 dynamically imported only when `encryptionPublicKey` is set. If your bundler is inlining that
-dynamic import, make sure it isn't configured to disable code splitting.
+dynamic import, make sure it isn't configured to disable code splitting. Browser source-map support
+(`sourceMaps: true`) is a second such chunk — leave it off unless you deploy your maps.
 
 ---
 

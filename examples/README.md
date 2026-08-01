@@ -49,6 +49,7 @@ and [`02-node-server-hmac.ts`](./02-node-server-hmac.ts).
 | [`10-react-error-boundary.tsx`](./10-react-error-boundary.tsx) | React error boundary and Vue error handler |
 | [`11-testing.ts`](./11-testing.ts) | Fake client injection, dry runs, disabling in tests |
 | [`12-typescript-types.ts`](./12-typescript-types.ts) | Using the exported types to map your own severity logic |
+| [`13-source-locations/`](./13-source-locations/) | Real file names in bundled apps: the build plugin for every bundler, and `bugboard/preload` |
 
 ## Two rules that apply to every example
 
@@ -56,3 +57,14 @@ and [`02-node-server-hmac.ts`](./02-node-server-hmac.ts).
    Use `await client.flush()` to force delivery.
 2. **Keep titles stable.** Dedup is server-side and matches on the title; put variable data
    (ids, timestamps) in the description or tags, never the title.
+
+## If your app is bundled
+
+Every example records the file and line it reported from. That is exact while you run these with
+`tsx` — but in a production build the call stack only names a chunk, and cards start saying
+`assets/index-a3f2b1.js:1`.
+
+Installing the SDK does not change your build. To get real file names you add a build plugin,
+which writes the location in at compile time with no source maps involved:
+[`13-source-locations/`](./13-source-locations/) has a ready config for every bundler, and
+[`../SOURCE_LOCATIONS.md`](../SOURCE_LOCATIONS.md) is the full reference.

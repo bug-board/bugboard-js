@@ -11,6 +11,10 @@
  * paths, `beforeExit` does NOT fire, so the report describing WHY you crashed —
  * the single most valuable one you'll ever queue — would be discarded unless you
  * flush it yourself.
+ *
+ * Note the error is always passed as the description. That is what makes these
+ * cards point at the code that failed instead of at this file — the SDK reads
+ * the error's own stack. See SOURCE_LOCATIONS.md.
  */
 
 import bugboard from './shared-client';

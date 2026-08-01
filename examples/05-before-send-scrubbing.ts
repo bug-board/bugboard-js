@@ -51,6 +51,9 @@ export default bugboard;
  * The payload shape (ReportPayload):
  *   { severity, priority, title, tags, description?, file_name?, line_number? }
  *
+ * `line_number` is only present when the client was created with
+ * `lineNumbers: true` — it is off by default. `file_name` is always attempted.
+ *
  * `beforeSend` is also great to develop against with a dry run — combine it with
  * `logLocally: true` so you can see exactly what your scrubber produces without
  * sending anything. See 11-testing.ts.
