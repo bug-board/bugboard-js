@@ -421,6 +421,26 @@ describe('transform', () => {
 
             expect(transform(markupOnly, '/work/app/src/App.vue', { root: ROOT })).toBeNull();
         });
+
+        // A tag the compilers accept but nobody writes by hand. Reading either
+        // one the way a browser does costs nothing; getting it wrong drops the
+        // block silently, which is the worst way for a build plugin to fail.
+        it('reads a script tag the way a compiler does, not the way it is usually written', () => {
+            // `>` inside a quoted attribute does not end the open tag: Vue's
+            // generic components routinely put type syntax there.
+            const generic = [
+                `<script setup lang="ts" generic="T extends Array<string>">`,
+                `import bugboard from './lib/bugboard';`,
+                `bugboard.criticalHigh('generic failure');`,
+                // HTML allows whitespace and ignored attributes in a close tag.
+                `</script foo>`,
+                `<template><div /></template>`,
+            ].join('\n');
+
+            const result = transform(generic, '/work/app/src/App.vue', { root: ROOT });
+
+            expect(injected(result!.code)).toEqual([{ file: 'src/App.vue', line: 3 }]);
+        });
     });
 
     it('skips a property chain that merely contains a method name', () => {

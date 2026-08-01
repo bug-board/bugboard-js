@@ -248,16 +248,24 @@ export function isSingleFileComponent(id: string): boolean {
  * point at which a `.vue` or `.svelte` file has a truthful line number to
  * record. A component can hold two (`<script>` plus `<script setup>` in Vue, or
  * `<script module>` in Svelte), so all of them are returned.
+ *
+ * Both tags are matched the way a compiler reads them rather than the way they
+ * are usually written. In the open tag, `>` inside a quoted attribute value does
+ * not end the tag — Vue's generic components put type syntax there
+ * (`generic="T extends Array<string>"`). In the close tag, HTML allows
+ * whitespace and even ignored attributes before the `>`. Missing either is
+ * silent: the region is lost or garbled, the body no longer lexes, and the
+ * component is passed through un-instrumented with nothing to explain why.
  */
 function scriptRegions(code: string): Region[] {
     const regions: Region[] = [];
-    const pattern = /<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi;
+    const pattern = /(<script\b(?:"[^"]*"|'[^']*'|[^>"'])*>)([\s\S]*?)<\/script(?:\s+[^>]*)?>/gi;
 
     for (const match of code.matchAll(pattern)) {
-        const body = match[1];
-        if (body === undefined || match.index === undefined) continue;
+        const [open, body] = [match[1], match[2]];
+        if (open === undefined || body === undefined || match.index === undefined) continue;
 
-        const offset = match.index + match[0].indexOf(body, match[0].indexOf('>'));
+        const offset = match.index + open.length;
         regions.push({ code: body, offset, lineBase: countNewlines(code, offset) });
     }
 
