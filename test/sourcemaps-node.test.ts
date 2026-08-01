@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { transformSync } from 'esbuild';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { enableNodeSourceMaps, isNodeRuntime } from '../src/sourcemaps-node';
@@ -11,6 +12,33 @@ const workspaces: string[] = [];
 afterAll(() => {
     for (const dir of workspaces) rmSync(dir, { recursive: true, force: true });
 });
+
+/** A scratch directory, removed once the file's tests have finished. */
+function workspace(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'bugboard-sourcemaps-'));
+    workspaces.push(dir);
+    return dir;
+}
+
+/**
+ * The SDK module as plain JS, for the child processes below to import.
+ *
+ * They run the bare `node` this suite was started with, and the SDK supports
+ * Node 20 — which cannot import TypeScript at all (type stripping arrived in
+ * 22.6). Stripping the types here keeps the child on syntax every supported
+ * version can load, while still running the real implementation.
+ */
+function writeSdkModule(dir: string): string {
+    const source = join(import.meta.dirname, '..', 'src', 'sourcemaps-node.ts');
+    const file = join(dir, 'sourcemaps-node.mjs');
+
+    writeFileSync(
+        file,
+        transformSync(readFileSync(source, 'utf8'), { loader: 'ts', format: 'esm' }).code,
+    );
+
+    return file;
+}
 
 /**
  * A module whose stack frames only resolve to `ORIGINAL_<name>.ts` if source
@@ -53,12 +81,11 @@ describe('enableNodeSourceMaps', () => {
         // Run in a child process: vitest configures source maps for its own
         // stack traces, so the enable/disable boundary is only observable in a
         // process this test controls from the start.
-        const dir = mkdtempSync(join(tmpdir(), 'bugboard-sourcemaps-'));
-        workspaces.push(dir);
+        const dir = workspace();
 
         const before = writeMappedModule(dir, 'before');
         const after = writeMappedModule(dir, 'after');
-        const sdk = join(import.meta.dirname, '..', 'src', 'sourcemaps-node.ts');
+        const sdk = writeSdkModule(dir);
 
         const probe = join(dir, 'probe.mjs');
         writeFileSync(
@@ -76,11 +103,9 @@ describe('enableNodeSourceMaps', () => {
             `,
         );
 
-        const output = execFileSync(
-            process.execPath,
-            ['--experimental-strip-types', '--no-warnings', probe],
-            { encoding: 'utf8' },
-        );
+        const output = execFileSync(process.execPath, ['--no-warnings', probe], {
+            encoding: 'utf8',
+        });
         const result = JSON.parse(output.trim()) as {
             status: string;
             earlyFrame: string;
@@ -96,12 +121,11 @@ describe('enableNodeSourceMaps', () => {
     });
 
     it('reports "already" without changing anything when the flag is set', () => {
-        const sdk = join(import.meta.dirname, '..', 'src', 'sourcemaps-node.ts');
+        const sdk = writeSdkModule(workspace());
         const output = execFileSync(
             process.execPath,
             [
                 '--enable-source-maps',
-                '--experimental-strip-types',
                 '--no-warnings',
                 '--input-type=module',
                 '-e',
