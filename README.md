@@ -311,13 +311,16 @@ import type {
 The SDK **never throws into your app** — these are exported so you can recognize failures on the
 debug channel and in your own logging, not because you have to catch them:
 
-| Class                     | Raised on                      | Extra                                   |
-| ------------------------- | ------------------------------ | --------------------------------------- |
-| `BugBoardError`           | base class for the four below  | —                                       |
-| `BugBoardAuthError`       | 401 / 403 — bad or revoked key | —                                       |
-| `BugBoardValidationError` | 422 — the payload was rejected | `fieldErrors: Record<string, string[]>` |
-| `BugBoardRateLimitError`  | 429 — too many reports         | `retryAfter?: number` (seconds)         |
-| `BugBoardServerError`     | 5xx, network failure, timeout  | —                                       |
+| Class                     | Raised on                                              | Extra                                   |
+| ------------------------- | ------------------------------------------------------ | --------------------------------------- |
+| `BugBoardError`           | base class — and any other 4xx (400, 404, 405, 413, …) | —                                       |
+| `BugBoardAuthError`       | 401 / 403 — bad or revoked key                         | —                                       |
+| `BugBoardValidationError` | 422 — the payload was rejected                         | `fieldErrors: Record<string, string[]>` |
+| `BugBoardRateLimitError`  | 429 — too many reports                                 | `retryAfter?: number` (seconds)         |
+| `BugBoardServerError`     | 5xx, network failure, timeout                          | —                                       |
+
+Only `BugBoardRateLimitError` and `BugBoardServerError` are retried. Any other 4xx is a
+configuration or payload bug that a retry cannot fix, so it fails on the first attempt.
 
 ## Contributing
 
