@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-03
+
+### Fixed
+
+- **A 400, 404, 405, or 413 was retried like a 5xx.** `Transport` classified every non-429 error
+  response as a `BugBoardServerError`, so any other 4xx — a misrouted endpoint, a body the route
+  won't take, a method it doesn't serve — was retried up to `maxRetries` times, spending ~4s of
+  backoff on a config or payload bug that retrying cannot fix. Those statuses now reject with the
+  base `BugBoardError`, which is not retried; only 429 and 5xx responses are.
+
+### Documentation
+
+- Fixed comments and README wording that called `tweetnacl-sealedbox-js` a "peer dependency" and
+  "lazy-loaded" — it's a regular dependency, dynamically imported only when payload encryption is
+  enabled.
+- Documented the `bugboard/esbuild` entry point in the usage guide's entry-points table.
+- Documented the Node 20/21 fallback to `setSourceMapsEnabled`, which has no `nodeModules` knob to
+  keep mapping narrow the way `setSourceMapsSupport` does on Node 22.14+.
+
 ## [1.2.0] - 2026-08-01
 
 This release is about **where a card points**. Reporting an error now names the code that threw it
@@ -171,7 +190,8 @@ plugin, and `line_number` became opt-in because outside a plugin build it was a 
   (`http://localhost:8000`, trailing slash optional) — the SDK appends `/api/v1/tasks` itself.
   A base URL that isn't absolute warns and falls back to `https://bugboard.dev`.
 
-[unreleased]: https://github.com/bug-board/bugboard-js/compare/v1.2.0...HEAD
+[unreleased]: https://github.com/bug-board/bugboard-js/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/bug-board/bugboard-js/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/bug-board/bugboard-js/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/bug-board/bugboard-js/compare/v1.1.1...v1.1.2
 [1.1.0]: https://github.com/bug-board/bugboard-js/compare/v1.0.0...v1.1.0

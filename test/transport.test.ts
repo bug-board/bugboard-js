@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveConfig } from '../src/config';
 import {
     BugBoardAuthError,
+    BugBoardError,
     BugBoardRateLimitError,
     BugBoardServerError,
     BugBoardValidationError,
@@ -270,12 +271,36 @@ describe('transport', () => {
         [401, BugBoardAuthError],
         [403, BugBoardAuthError],
         [422, BugBoardValidationError],
+        [400, BugBoardError],
+        [404, BugBoardError],
+        [405, BugBoardError],
+        [413, BugBoardError],
     ])('never retries a %i', async (status, errorClass) => {
         const fetchMock = vi.fn().mockResolvedValue(jsonResponse(status, { message: 'nope' }));
         vi.stubGlobal('fetch', fetchMock);
 
         await expect(settle(transportWith().send(payload))).rejects.toBeInstanceOf(errorClass);
         expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([[400], [404], [413]])('does not classify a %i as a server error', async (status) => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(status, { message: 'nope' }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const error = await settle(transportWith().send(payload)).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(BugBoardError);
+        expect(error).not.toBeInstanceOf(BugBoardServerError);
+    });
+
+    it.each([[500], [502], [503]])('retries a %i', async (status) => {
+        const fetchMock = vi.fn().mockResolvedValue(jsonResponse(status, { message: 'kaput' }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(settle(transportWith({ maxRetries: 2 }).send(payload))).rejects.toBeInstanceOf(
+            BugBoardServerError,
+        );
+        expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
     it('carries the field errors on a 422', async () => {

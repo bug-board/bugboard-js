@@ -1,6 +1,7 @@
 /**
- * Minimal typings for the optional `tweetnacl-sealedbox-js` peer dependency
- * (the package ships without TypeScript declarations).
+ * Minimal typings for the `tweetnacl-sealedbox-js` dependency (the package ships
+ * without TypeScript declarations). It is a regular dependency, imported
+ * dynamically so it only loads when payload encryption is enabled.
  */
 declare module 'tweetnacl-sealedbox-js' {
     export function seal(message: Uint8Array, publicKey: Uint8Array): Uint8Array;

@@ -72,7 +72,16 @@ async function toError(response: Response): Promise<BugBoardError> {
     if (response.status === 429) {
         return new BugBoardRateLimitError(message, parseRetryAfter(response));
     }
-    return new BugBoardServerError(message);
+    if (response.status >= 500) {
+        return new BugBoardServerError(message);
+    }
+
+    // Any other 4xx — and a stray 3xx, which `response.ok` also rejects — is a
+    // config or payload bug: a misrouted endpoint, a body the route won't take,
+    // a method it doesn't serve. Retrying cannot fix it, and doing so would
+    // spend four attempts and ~4s of backoff inside the host app on every
+    // report. It degrades to the base class, which `isRetryable` excludes.
+    return new BugBoardError(message);
 }
 
 /** Only 429, 5xx, and network failures are retried; other 4xx are config/payload bugs. */
