@@ -160,7 +160,7 @@ There is nothing framework-specific to install. The SDK is one framework-agnosti
 platform APIs (`fetch`, WebCrypto), so the same package runs unchanged in Node, browsers, bundlers,
 and edge runtimes. It ships ESM + CJS builds with full TypeScript types.
 
-Everything is reached through the one import, `bugboard`, except three build-time or startup-time
+Everything is reached through the one import, `bugboard`, except the build-time and startup-time
 entry points that deliberately sit outside it — see
 [Source locations in bundled apps](#source-locations-in-bundled-apps):
 
@@ -168,6 +168,7 @@ entry points that deliberately sit outside it — see
 | ---------------------------------- | --------------- | ------------------------------------------------- |
 | `bugboard/vite`, `bugboard/rollup` | in your bundler | Rewrites call sites with their real file and line |
 | `bugboard/webpack`                 | in your bundler | The same, as a webpack loader                     |
+| `bugboard/esbuild`                 | in your bundler | The same, as an esbuild plugin                    |
 | `bugboard/preload`                 | before your app | Turns on Node's source-map support                |
 
 The only dependency is `tweetnacl-sealedbox-js`, and it is dynamically imported the first time an

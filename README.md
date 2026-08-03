@@ -4,7 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/bugboard.svg)](https://www.npmjs.com/package/bugboard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report bugs as **cards** on your project board — from Node 20+, browsers, and edge runtimes — built on the platform `fetch`. Importing the SDK pulls in **nothing else**: the one bundled dependency is a sealed-box binding that is lazy-loaded only if you turn on payload encryption.
+Official [BugBoard](https://bugboard.dev) SDK for JavaScript and TypeScript. Report bugs as **cards** on your project board — from Node 20+, browsers, and edge runtimes — built on the platform `fetch`. Importing the SDK **loads no dependencies**: its one dependency is a sealed-box binding, dynamically imported only if you turn on payload encryption.
 
 ```ts
 import { createClient } from 'bugboard';
@@ -21,9 +21,10 @@ try {
 Reporting is **fire-and-forget**: the call returns immediately, delivery happens on a background
 queue with retries and backoff, and the SDK **never throws into your app**.
 
-> 📖 **[Usage guide](docs/USAGE.md)** — in-depth integration for Express, Fastify, NestJS, Next.js,
+> 📖 **[Usage guide](docs/USAGE.md)** — integration guides for Express, Fastify, NestJS, Next.js,
 > Nuxt, SvelteKit, Remix, Vite SPAs, and serverless/edge runtimes, plus flushing semantics, testing,
-> and troubleshooting.
+> and troubleshooting. There is no framework-specific package to install — these are recipes for
+> wiring the same framework-agnostic client into each one.
 >
 > 📁 **[Examples](examples/)** — copy-paste-ready files for every usage mode: browser publishable
 > key, server HMAC, encryption, `beforeSend` scrubbing, serverless flushing, process handlers,

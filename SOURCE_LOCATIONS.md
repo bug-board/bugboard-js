@@ -291,12 +291,18 @@ just has to be told to.
 source is read by the SDK** — this is a one-line call into the runtime:
 
 ```ts
-// what the SDK does, in effect
+// what the SDK does, in effect — Node 22.14+
 process.getBuiltinModule('node:module').setSourceMapsSupport(true, { nodeModules: false });
+
+// Node 20 and 21 don't have setSourceMapsSupport yet, so the SDK falls back to the
+// older, broader API instead:
+process.setSourceMapsEnabled(true);
 ```
 
-`nodeModules: false` keeps it narrow: your code is mapped, your dependencies are not, which avoids
-reading a map for every package that ships one on every cold start.
+On Node 22.14+, `nodeModules: false` keeps it narrow: your code is mapped, your dependencies are
+not, which avoids reading a map for every package that ships one on every cold start. On Node 20
+and 21 — the package's minimum supported version — there's no equivalent knob: the fallback API
+maps `node_modules` and `eval`'d code too, not just your own files.
 
 This affects **both** the reported location _and_ the stack text inside a caught error's
 `description` — it is the only mechanism that improves the latter. Where it applies, the line is
@@ -450,7 +456,11 @@ esbuild uses `filter` instead of `include` (esbuild requires the filter at regis
 createClient({ apiKey: '…', captureLocation: false, sourceMaps: false });
 ```
 
-Cards will then carry no `file_name` or `line_number` at all.
+Cards will then carry no `file_name` or `line_number` — **unless a build plugin is installed**.
+`captureLocation` gates the two mechanisms that read a stack at runtime (error throw sites and
+call-site capture); it does not gate a location the plugin wrote into the call at compile time,
+because by then there is nothing left to switch off. To drop those too, remove the plugin from
+your bundler config — see the row below.
 
 **Individually:**
 
@@ -464,7 +474,8 @@ Cards will then carry no `file_name` or `line_number` at all.
 | The build plugin        | Remove it from your bundler config               |
 
 Turning line numbers off keeps the file name: `lineNumbers: false` drops one field, whereas
-`captureLocation: false` stops the SDK reading the stack at all and drops both.
+`captureLocation: false` stops the SDK reading the stack at all — which drops both, on any report
+whose location would have come from a stack.
 
 **To strip locations from reports that are already built**, without changing any of the above:
 
